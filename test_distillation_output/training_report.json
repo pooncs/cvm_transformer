@@ -1,0 +1,69 @@
+{
+  "config": {
+    "teacher_model_name": "deepseek-ai/deepseek-coder-1.3b-instruct",
+    "student_vocab_size": 32000,
+    "student_d_model": 512,
+    "student_n_heads": 8,
+    "student_n_layers": 6,
+    "student_ff_dim": 2048,
+    "temperature": 6.0,
+    "alpha": 0.8,
+    "beta": 0.3,
+    "num_iterations": 100,
+    "batch_size": 8,
+    "learning_rate": 5e-05,
+    "warmup_steps": 1000,
+    "max_grad_norm": 1.0,
+    "validation_frequency": 50,
+    "early_stopping_patience": 2,
+    "quality_threshold": 0.8,
+    "quantization_aware_training": true,
+    "quantization_bits": 8,
+    "log_frequency": 10,
+    "save_frequency": 50,
+    "output_dir": "test_distillation_output"
+  },
+  "training_history": {},
+  "validation_history": [
+    {
+      "iteration": 0,
+      "quality_score": 1.2,
+      "metrics": {
+        "bleu": 0.027884615384615386,
+        "rouge1": 0.027884615384615386,
+        "rouge2": 0.02230769230769231,
+        "rouge_l": 0.025096153846153848,
+        "ter": 0.9721153846153846,
+        "bert_score": 0.026490384615384617
+      },
+      "degradation_detected": false,
+      "rollback_recommended": false
+    }
+  ],
+  "quality_assurance": {
+    "final_quality_score": 1.2,
+    "best_quality_score": 1.2,
+    "quality_retention_percentage": 100.0,
+    "meets_90_percent_requirement": "True",
+    "quality_threshold": 0.8,
+    "total_validations": 1,
+    "degradation_count": 0,
+    "rollback_points_saved": 0
+  },
+  "model_analysis": {
+    "student_model_parameters": 51715328,
+    "teacher_model_parameters": 1300000000,
+    "compression_ratio": 25.137614905971397,
+    "model_size_mb": 197.2783203125,
+    "quantization_applied": true,
+    "quantization_bits": 8
+  },
+  "training_summary": {
+    "total_iterations": 0,
+    "target_iterations": 100,
+    "early_stop_triggered": false,
+    "training_success": false,
+    "best_validation_score": 0.0,
+    "best_quality_score": 1.2
+  }
+}

@@ -1,0 +1,33 @@
+[
+  {
+    "iteration": 0,
+    "timestamp": 1763134424.1287804,
+    "metrics": {
+      "bleu": 0.027884615384615386,
+      "rouge1": 0.027884615384615386,
+      "rouge2": 0.02230769230769231,
+      "rouge_l": 0.025096153846153848,
+      "ter": 0.9721153846153846,
+      "bert_score": 0.026490384615384617
+    },
+    "quality_score": 1.2,
+    "teacher_metrics": {
+      "bleu": 0.027884615384615386,
+      "rouge1": 0.027884615384615386,
+      "rouge2": 0.02230769230769231,
+      "rouge_l": 0.025096153846153848,
+      "ter": 0.9721153846153846,
+      "bert_score": 0.026490384615384617
+    },
+    "comparison_ratios": {
+      "bleu": 1.0,
+      "rouge1": 1.0,
+      "rouge2": 1.0,
+      "rouge_l": 1.0,
+      "ter": 1.0,
+      "bert_score": 1.0
+    },
+    "degradation_detected": false,
+    "rollback_recommended": false
+  }
+]
