@@ -3,6 +3,34 @@ __pycache__/
 *.py[codz]
 *$py.class
 *.pt
+*.pth
+*.json
+
+# Project-specific artifacts
+checkpoints/
+models/
+*.bin
+*.onnx
+
+# Experiment outputs and reports
+artifacts/
+reports/
+benchmarks/
+distillation_output/
+test_distillation_output/
+latency_vs_cores.png
+memory_vs_cores.png
+benchmark_results.json
+training_10k_simple_results.json
+training_report.json
+
+# Logs and telemetry
+logs/
+telemetry.json
+*.log
+
+# Config overrides
+configs/local/
 
 # C extensions
 *.so

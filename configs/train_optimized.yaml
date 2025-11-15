@@ -1,0 +1,69 @@
+# Optimized training configuration for 99% perfect translation score
+device: auto  # auto, cpu, cuda
+vocab_size: 32000
+d_model: 1024  # Increased from 768 for better representation
+n_layers_student: 8  # Increased from 6
+n_layers_teacher: 16  # Increased from 12
+core_capacity_student: 128  # Increased from 64
+core_capacity_teacher: 512  # Increased from 256
+max_len: 128  # Increased from 64 for longer sequences
+batch_size: 64  # Increased from 32 for better gradient estimation
+learning_rate: 5e-5  # Reduced for more stable convergence
+total_iterations: 50000  # Increased from 10000 for thorough training
+validation_frequency: 500  # More frequent validation
+warmup_steps: 2000  # Added warmup for stable training
+gradient_clip_norm: 1.0  # Added gradient clipping
+label_smoothing: 0.1  # Added label smoothing for better generalization
+
+# Advanced SOTA features - all enabled for maximum performance
+use_flash_attention: true  # Enable Flash Attention for efficiency
+use_mamba_layer: true  # Enable Mamba layers for better sequence modeling
+use_lion_optimizer: true  # Enable Lion optimizer for faster convergence
+use_adafactor_optimizer: false  # Disabled in favor of Lion
+use_quantization: false  # Disabled for training, can be enabled for inference
+use_mixed_precision: true  # Enable mixed precision training
+use_gradient_accumulation: true  # Enable gradient accumulation for larger effective batch size
+gradient_accumulation_steps: 4  # 4 steps accumulation = effective batch size of 256
+
+# Data augmentation and regularization
+use_data_augmentation: true  # Enable data augmentation
+augmentation_prob: 0.2  # 20% augmentation probability
+dropout_rate: 0.1  # Consistent dropout rate
+attention_dropout: 0.1  # Attention-specific dropout
+activation_dropout: 0.1  # Activation dropout
+
+# Learning rate scheduling
+lr_scheduler: "cosine_with_restarts"  # Cosine annealing with restarts
+num_warmup_steps: 2000
+num_training_steps: 50000
+num_cycles: 3  # 3 cycles of cosine annealing
+
+# Early stopping and model selection
+early_stopping_patience: 10  # Stop if no improvement for 10 validations
+model_selection_metric: "bleu_score"  # Select based on BLEU score
+save_top_k: 3  # Save top 3 models
+
+# Logging and checkpointing
+log_dir: logs_optimized
+reports_dir: reports_optimized
+checkpoint_dir: checkpoints_optimized
+checkpoint_frequency: 1000  # Save checkpoint every 1000 steps
+
+# Evaluation settings
+eval_beam_size: 5  # Beam search size for evaluation
+eval_length_penalty: 1.0  # Length penalty for evaluation
+generate_max_length: 150  # Maximum generation length
+
+# Distillation settings (for teacher-student training)
+distillation_temperature: 4.0  # Temperature for knowledge distillation
+distillation_alpha: 0.5  # Balance between distillation and ground truth
+
+# Multilingual and cross-lingual settings
+use_multilingual_training: true  # Enable multilingual training
+language_sampling_temperature: 5.0  # Temperature for language sampling
+
+# Quality and robustness
+use_back_translation: true  # Enable back-translation
+back_translation_weight: 0.3  # Weight for back-translated data
+use_noise_injection: true  # Add noise during training
+noise_prob: 0.1  # 10% noise injection probability

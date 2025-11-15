@@ -1,0 +1,25 @@
+# Training configuration with Lion optimizer
+device: auto
+vocab_size: 32000
+d_model: 768
+n_layers_student: 6
+n_layers_teacher: 12
+core_capacity_student: 64
+core_capacity_teacher: 256
+max_len: 64
+batch_size: 32
+learning_rate: 1e-4
+total_iterations: 10000
+validation_frequency: 1000
+
+# SOTA toggles - enable Lion optimizer
+use_flash_attention: false
+use_mamba_layer: false
+use_lion_optimizer: true
+use_adafactor_optimizer: false
+use_quantization: false
+
+# Logging
+log_dir: logs_lion
+reports_dir: reports_lion
+checkpoint_dir: checkpoints_lion
