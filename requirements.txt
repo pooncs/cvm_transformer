@@ -1,0 +1,7 @@
+torch>=2.0
+sentencepiece>=0.2
+grpcio>=1.76
+grpcio-tools>=1.76
+numpy>=1.24
+psutil>=5.9
+matplotlib>=3.7

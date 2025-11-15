@@ -1,0 +1,560 @@
+Hello. This is sentence number 0.
+Hello. This is sentence number 1.
+Hello. This is sentence number 2.
+Hello. This is sentence number 3.
+Hello. This is sentence number 4.
+Hello. This is sentence number 5.
+Hello. This is sentence number 6.
+Hello. This is sentence number 7.
+Hello. This is sentence number 8.
+Hello. This is sentence number 9.
+Hello. This is sentence number 10.
+Hello. This is sentence number 11.
+Hello. This is sentence number 12.
+Hello. This is sentence number 13.
+Hello. This is sentence number 14.
+Hello. This is sentence number 15.
+Hello. This is sentence number 16.
+Hello. This is sentence number 17.
+Hello. This is sentence number 18.
+Hello. This is sentence number 19.
+Hello. This is sentence number 20.
+Hello. This is sentence number 21.
+Hello. This is sentence number 22.
+Hello. This is sentence number 23.
+Hello. This is sentence number 24.
+Hello. This is sentence number 25.
+Hello. This is sentence number 26.
+Hello. This is sentence number 27.
+Hello. This is sentence number 28.
+Hello. This is sentence number 29.
+Hello. This is sentence number 30.
+Hello. This is sentence number 31.
+Hello. This is sentence number 32.
+Hello. This is sentence number 33.
+Hello. This is sentence number 34.
+Hello. This is sentence number 35.
+Hello. This is sentence number 36.
+Hello. This is sentence number 37.
+Hello. This is sentence number 38.
+Hello. This is sentence number 39.
+Hello. This is sentence number 40.
+Hello. This is sentence number 41.
+Hello. This is sentence number 42.
+Hello. This is sentence number 43.
+Hello. This is sentence number 44.
+Hello. This is sentence number 45.
+Hello. This is sentence number 46.
+Hello. This is sentence number 47.
+Hello. This is sentence number 48.
+Hello. This is sentence number 49.
+Thank you. This is sentence number 0.
+Thank you. This is sentence number 1.
+Thank you. This is sentence number 2.
+Thank you. This is sentence number 3.
+Thank you. This is sentence number 4.
+Thank you. This is sentence number 5.
+Thank you. This is sentence number 6.
+Thank you. This is sentence number 7.
+Thank you. This is sentence number 8.
+Thank you. This is sentence number 9.
+Thank you. This is sentence number 10.
+Thank you. This is sentence number 11.
+Thank you. This is sentence number 12.
+Thank you. This is sentence number 13.
+Thank you. This is sentence number 14.
+Thank you. This is sentence number 15.
+Thank you. This is sentence number 16.
+Thank you. This is sentence number 17.
+Thank you. This is sentence number 18.
+Thank you. This is sentence number 19.
+Thank you. This is sentence number 20.
+Thank you. This is sentence number 21.
+Thank you. This is sentence number 22.
+Thank you. This is sentence number 23.
+Thank you. This is sentence number 24.
+Thank you. This is sentence number 25.
+Thank you. This is sentence number 26.
+Thank you. This is sentence number 27.
+Thank you. This is sentence number 28.
+Thank you. This is sentence number 29.
+Thank you. This is sentence number 30.
+Thank you. This is sentence number 31.
+Thank you. This is sentence number 32.
+Thank you. This is sentence number 33.
+Thank you. This is sentence number 34.
+Thank you. This is sentence number 35.
+Thank you. This is sentence number 36.
+Thank you. This is sentence number 37.
+Thank you. This is sentence number 38.
+Thank you. This is sentence number 39.
+Thank you. This is sentence number 40.
+Thank you. This is sentence number 41.
+Thank you. This is sentence number 42.
+Thank you. This is sentence number 43.
+Thank you. This is sentence number 44.
+Thank you. This is sentence number 45.
+Thank you. This is sentence number 46.
+Thank you. This is sentence number 47.
+Thank you. This is sentence number 48.
+Thank you. This is sentence number 49.
+Sorry. This is sentence number 0.
+Sorry. This is sentence number 1.
+Sorry. This is sentence number 2.
+Sorry. This is sentence number 3.
+Sorry. This is sentence number 4.
+Sorry. This is sentence number 5.
+Sorry. This is sentence number 6.
+Sorry. This is sentence number 7.
+Sorry. This is sentence number 8.
+Sorry. This is sentence number 9.
+Sorry. This is sentence number 10.
+Sorry. This is sentence number 11.
+Sorry. This is sentence number 12.
+Sorry. This is sentence number 13.
+Sorry. This is sentence number 14.
+Sorry. This is sentence number 15.
+Sorry. This is sentence number 16.
+Sorry. This is sentence number 17.
+Sorry. This is sentence number 18.
+Sorry. This is sentence number 19.
+Sorry. This is sentence number 20.
+Sorry. This is sentence number 21.
+Sorry. This is sentence number 22.
+Sorry. This is sentence number 23.
+Sorry. This is sentence number 24.
+Sorry. This is sentence number 25.
+Sorry. This is sentence number 26.
+Sorry. This is sentence number 27.
+Sorry. This is sentence number 28.
+Sorry. This is sentence number 29.
+Sorry. This is sentence number 30.
+Sorry. This is sentence number 31.
+Sorry. This is sentence number 32.
+Sorry. This is sentence number 33.
+Sorry. This is sentence number 34.
+Sorry. This is sentence number 35.
+Sorry. This is sentence number 36.
+Sorry. This is sentence number 37.
+Sorry. This is sentence number 38.
+Sorry. This is sentence number 39.
+Sorry. This is sentence number 40.
+Sorry. This is sentence number 41.
+Sorry. This is sentence number 42.
+Sorry. This is sentence number 43.
+Sorry. This is sentence number 44.
+Sorry. This is sentence number 45.
+Sorry. This is sentence number 46.
+Sorry. This is sentence number 47.
+Sorry. This is sentence number 48.
+Sorry. This is sentence number 49.
+Yes. This is sentence number 0.
+Yes. This is sentence number 1.
+Yes. This is sentence number 2.
+Yes. This is sentence number 3.
+Yes. This is sentence number 4.
+Yes. This is sentence number 5.
+Yes. This is sentence number 6.
+Yes. This is sentence number 7.
+Yes. This is sentence number 8.
+Yes. This is sentence number 9.
+Yes. This is sentence number 10.
+Yes. This is sentence number 11.
+Yes. This is sentence number 12.
+Yes. This is sentence number 13.
+Yes. This is sentence number 14.
+Yes. This is sentence number 15.
+Yes. This is sentence number 16.
+Yes. This is sentence number 17.
+Yes. This is sentence number 18.
+Yes. This is sentence number 19.
+Yes. This is sentence number 20.
+Yes. This is sentence number 21.
+Yes. This is sentence number 22.
+Yes. This is sentence number 23.
+Yes. This is sentence number 24.
+Yes. This is sentence number 25.
+Yes. This is sentence number 26.
+Yes. This is sentence number 27.
+Yes. This is sentence number 28.
+Yes. This is sentence number 29.
+Yes. This is sentence number 30.
+Yes. This is sentence number 31.
+Yes. This is sentence number 32.
+Yes. This is sentence number 33.
+Yes. This is sentence number 34.
+Yes. This is sentence number 35.
+Yes. This is sentence number 36.
+Yes. This is sentence number 37.
+Yes. This is sentence number 38.
+Yes. This is sentence number 39.
+Yes. This is sentence number 40.
+Yes. This is sentence number 41.
+Yes. This is sentence number 42.
+Yes. This is sentence number 43.
+Yes. This is sentence number 44.
+Yes. This is sentence number 45.
+Yes. This is sentence number 46.
+Yes. This is sentence number 47.
+Yes. This is sentence number 48.
+Yes. This is sentence number 49.
+No. This is sentence number 0.
+No. This is sentence number 1.
+No. This is sentence number 2.
+No. This is sentence number 3.
+No. This is sentence number 4.
+No. This is sentence number 5.
+No. This is sentence number 6.
+No. This is sentence number 7.
+No. This is sentence number 8.
+No. This is sentence number 9.
+No. This is sentence number 10.
+No. This is sentence number 11.
+No. This is sentence number 12.
+No. This is sentence number 13.
+No. This is sentence number 14.
+No. This is sentence number 15.
+No. This is sentence number 16.
+No. This is sentence number 17.
+No. This is sentence number 18.
+No. This is sentence number 19.
+No. This is sentence number 20.
+No. This is sentence number 21.
+No. This is sentence number 22.
+No. This is sentence number 23.
+No. This is sentence number 24.
+No. This is sentence number 25.
+No. This is sentence number 26.
+No. This is sentence number 27.
+No. This is sentence number 28.
+No. This is sentence number 29.
+No. This is sentence number 30.
+No. This is sentence number 31.
+No. This is sentence number 32.
+No. This is sentence number 33.
+No. This is sentence number 34.
+No. This is sentence number 35.
+No. This is sentence number 36.
+No. This is sentence number 37.
+No. This is sentence number 38.
+No. This is sentence number 39.
+No. This is sentence number 40.
+No. This is sentence number 41.
+No. This is sentence number 42.
+No. This is sentence number 43.
+No. This is sentence number 44.
+No. This is sentence number 45.
+No. This is sentence number 46.
+No. This is sentence number 47.
+No. This is sentence number 48.
+No. This is sentence number 49.
+Good. This is sentence number 0.
+Good. This is sentence number 1.
+Good. This is sentence number 2.
+Good. This is sentence number 3.
+Good. This is sentence number 4.
+Good. This is sentence number 5.
+Good. This is sentence number 6.
+Good. This is sentence number 7.
+Good. This is sentence number 8.
+Good. This is sentence number 9.
+Good. This is sentence number 10.
+Good. This is sentence number 11.
+Good. This is sentence number 12.
+Good. This is sentence number 13.
+Good. This is sentence number 14.
+Good. This is sentence number 15.
+Good. This is sentence number 16.
+Good. This is sentence number 17.
+Good. This is sentence number 18.
+Good. This is sentence number 19.
+Good. This is sentence number 20.
+Good. This is sentence number 21.
+Good. This is sentence number 22.
+Good. This is sentence number 23.
+Good. This is sentence number 24.
+Good. This is sentence number 25.
+Good. This is sentence number 26.
+Good. This is sentence number 27.
+Good. This is sentence number 28.
+Good. This is sentence number 29.
+Good. This is sentence number 30.
+Good. This is sentence number 31.
+Good. This is sentence number 32.
+Good. This is sentence number 33.
+Good. This is sentence number 34.
+Good. This is sentence number 35.
+Good. This is sentence number 36.
+Good. This is sentence number 37.
+Good. This is sentence number 38.
+Good. This is sentence number 39.
+Good. This is sentence number 40.
+Good. This is sentence number 41.
+Good. This is sentence number 42.
+Good. This is sentence number 43.
+Good. This is sentence number 44.
+Good. This is sentence number 45.
+Good. This is sentence number 46.
+Good. This is sentence number 47.
+Good. This is sentence number 48.
+Good. This is sentence number 49.
+Goodbye. This is sentence number 0.
+Goodbye. This is sentence number 1.
+Goodbye. This is sentence number 2.
+Goodbye. This is sentence number 3.
+Goodbye. This is sentence number 4.
+Goodbye. This is sentence number 5.
+Goodbye. This is sentence number 6.
+Goodbye. This is sentence number 7.
+Goodbye. This is sentence number 8.
+Goodbye. This is sentence number 9.
+Goodbye. This is sentence number 10.
+Goodbye. This is sentence number 11.
+Goodbye. This is sentence number 12.
+Goodbye. This is sentence number 13.
+Goodbye. This is sentence number 14.
+Goodbye. This is sentence number 15.
+Goodbye. This is sentence number 16.
+Goodbye. This is sentence number 17.
+Goodbye. This is sentence number 18.
+Goodbye. This is sentence number 19.
+Goodbye. This is sentence number 20.
+Goodbye. This is sentence number 21.
+Goodbye. This is sentence number 22.
+Goodbye. This is sentence number 23.
+Goodbye. This is sentence number 24.
+Goodbye. This is sentence number 25.
+Goodbye. This is sentence number 26.
+Goodbye. This is sentence number 27.
+Goodbye. This is sentence number 28.
+Goodbye. This is sentence number 29.
+Goodbye. This is sentence number 30.
+Goodbye. This is sentence number 31.
+Goodbye. This is sentence number 32.
+Goodbye. This is sentence number 33.
+Goodbye. This is sentence number 34.
+Goodbye. This is sentence number 35.
+Goodbye. This is sentence number 36.
+Goodbye. This is sentence number 37.
+Goodbye. This is sentence number 38.
+Goodbye. This is sentence number 39.
+Goodbye. This is sentence number 40.
+Goodbye. This is sentence number 41.
+Goodbye. This is sentence number 42.
+Goodbye. This is sentence number 43.
+Goodbye. This is sentence number 44.
+Goodbye. This is sentence number 45.
+Goodbye. This is sentence number 46.
+Goodbye. This is sentence number 47.
+Goodbye. This is sentence number 48.
+Goodbye. This is sentence number 49.
+The real-time translation system uses 0 parameters.
+The real-time translation system uses 1 parameters.
+The real-time translation system uses 2 parameters.
+The real-time translation system uses 3 parameters.
+The real-time translation system uses 4 parameters.
+The real-time translation system uses 5 parameters.
+The real-time translation system uses 6 parameters.
+The real-time translation system uses 7 parameters.
+The real-time translation system uses 8 parameters.
+The real-time translation system uses 9 parameters.
+The real-time translation system uses 10 parameters.
+The real-time translation system uses 11 parameters.
+The real-time translation system uses 12 parameters.
+The real-time translation system uses 13 parameters.
+The real-time translation system uses 14 parameters.
+The real-time translation system uses 15 parameters.
+The real-time translation system uses 16 parameters.
+The real-time translation system uses 17 parameters.
+The real-time translation system uses 18 parameters.
+The real-time translation system uses 19 parameters.
+The real-time translation system uses 20 parameters.
+The real-time translation system uses 21 parameters.
+The real-time translation system uses 22 parameters.
+The real-time translation system uses 23 parameters.
+The real-time translation system uses 24 parameters.
+The real-time translation system uses 25 parameters.
+The real-time translation system uses 26 parameters.
+The real-time translation system uses 27 parameters.
+The real-time translation system uses 28 parameters.
+The real-time translation system uses 29 parameters.
+The deep learning system uses 0 parameters.
+The deep learning system uses 1 parameters.
+The deep learning system uses 2 parameters.
+The deep learning system uses 3 parameters.
+The deep learning system uses 4 parameters.
+The deep learning system uses 5 parameters.
+The deep learning system uses 6 parameters.
+The deep learning system uses 7 parameters.
+The deep learning system uses 8 parameters.
+The deep learning system uses 9 parameters.
+The deep learning system uses 10 parameters.
+The deep learning system uses 11 parameters.
+The deep learning system uses 12 parameters.
+The deep learning system uses 13 parameters.
+The deep learning system uses 14 parameters.
+The deep learning system uses 15 parameters.
+The deep learning system uses 16 parameters.
+The deep learning system uses 17 parameters.
+The deep learning system uses 18 parameters.
+The deep learning system uses 19 parameters.
+The deep learning system uses 20 parameters.
+The deep learning system uses 21 parameters.
+The deep learning system uses 22 parameters.
+The deep learning system uses 23 parameters.
+The deep learning system uses 24 parameters.
+The deep learning system uses 25 parameters.
+The deep learning system uses 26 parameters.
+The deep learning system uses 27 parameters.
+The deep learning system uses 28 parameters.
+The deep learning system uses 29 parameters.
+The neural network system uses 0 parameters.
+The neural network system uses 1 parameters.
+The neural network system uses 2 parameters.
+The neural network system uses 3 parameters.
+The neural network system uses 4 parameters.
+The neural network system uses 5 parameters.
+The neural network system uses 6 parameters.
+The neural network system uses 7 parameters.
+The neural network system uses 8 parameters.
+The neural network system uses 9 parameters.
+The neural network system uses 10 parameters.
+The neural network system uses 11 parameters.
+The neural network system uses 12 parameters.
+The neural network system uses 13 parameters.
+The neural network system uses 14 parameters.
+The neural network system uses 15 parameters.
+The neural network system uses 16 parameters.
+The neural network system uses 17 parameters.
+The neural network system uses 18 parameters.
+The neural network system uses 19 parameters.
+The neural network system uses 20 parameters.
+The neural network system uses 21 parameters.
+The neural network system uses 22 parameters.
+The neural network system uses 23 parameters.
+The neural network system uses 24 parameters.
+The neural network system uses 25 parameters.
+The neural network system uses 26 parameters.
+The neural network system uses 27 parameters.
+The neural network system uses 28 parameters.
+The neural network system uses 29 parameters.
+The algorithm system uses 0 parameters.
+The algorithm system uses 1 parameters.
+The algorithm system uses 2 parameters.
+The algorithm system uses 3 parameters.
+The algorithm system uses 4 parameters.
+The algorithm system uses 5 parameters.
+The algorithm system uses 6 parameters.
+The algorithm system uses 7 parameters.
+The algorithm system uses 8 parameters.
+The algorithm system uses 9 parameters.
+The algorithm system uses 10 parameters.
+The algorithm system uses 11 parameters.
+The algorithm system uses 12 parameters.
+The algorithm system uses 13 parameters.
+The algorithm system uses 14 parameters.
+The algorithm system uses 15 parameters.
+The algorithm system uses 16 parameters.
+The algorithm system uses 17 parameters.
+The algorithm system uses 18 parameters.
+The algorithm system uses 19 parameters.
+The algorithm system uses 20 parameters.
+The algorithm system uses 21 parameters.
+The algorithm system uses 22 parameters.
+The algorithm system uses 23 parameters.
+The algorithm system uses 24 parameters.
+The algorithm system uses 25 parameters.
+The algorithm system uses 26 parameters.
+The algorithm system uses 27 parameters.
+The algorithm system uses 28 parameters.
+The algorithm system uses 29 parameters.
+The optimization system uses 0 parameters.
+The optimization system uses 1 parameters.
+The optimization system uses 2 parameters.
+The optimization system uses 3 parameters.
+The optimization system uses 4 parameters.
+The optimization system uses 5 parameters.
+The optimization system uses 6 parameters.
+The optimization system uses 7 parameters.
+The optimization system uses 8 parameters.
+The optimization system uses 9 parameters.
+The optimization system uses 10 parameters.
+The optimization system uses 11 parameters.
+The optimization system uses 12 parameters.
+The optimization system uses 13 parameters.
+The optimization system uses 14 parameters.
+The optimization system uses 15 parameters.
+The optimization system uses 16 parameters.
+The optimization system uses 17 parameters.
+The optimization system uses 18 parameters.
+The optimization system uses 19 parameters.
+The optimization system uses 20 parameters.
+The optimization system uses 21 parameters.
+The optimization system uses 22 parameters.
+The optimization system uses 23 parameters.
+The optimization system uses 24 parameters.
+The optimization system uses 25 parameters.
+The optimization system uses 26 parameters.
+The optimization system uses 27 parameters.
+The optimization system uses 28 parameters.
+The optimization system uses 29 parameters.
+The efficiency system uses 0 parameters.
+The efficiency system uses 1 parameters.
+The efficiency system uses 2 parameters.
+The efficiency system uses 3 parameters.
+The efficiency system uses 4 parameters.
+The efficiency system uses 5 parameters.
+The efficiency system uses 6 parameters.
+The efficiency system uses 7 parameters.
+The efficiency system uses 8 parameters.
+The efficiency system uses 9 parameters.
+The efficiency system uses 10 parameters.
+The efficiency system uses 11 parameters.
+The efficiency system uses 12 parameters.
+The efficiency system uses 13 parameters.
+The efficiency system uses 14 parameters.
+The efficiency system uses 15 parameters.
+The efficiency system uses 16 parameters.
+The efficiency system uses 17 parameters.
+The efficiency system uses 18 parameters.
+The efficiency system uses 19 parameters.
+The efficiency system uses 20 parameters.
+The efficiency system uses 21 parameters.
+The efficiency system uses 22 parameters.
+The efficiency system uses 23 parameters.
+The efficiency system uses 24 parameters.
+The efficiency system uses 25 parameters.
+The efficiency system uses 26 parameters.
+The efficiency system uses 27 parameters.
+The efficiency system uses 28 parameters.
+The efficiency system uses 29 parameters.
+The accuracy system uses 0 parameters.
+The accuracy system uses 1 parameters.
+The accuracy system uses 2 parameters.
+The accuracy system uses 3 parameters.
+The accuracy system uses 4 parameters.
+The accuracy system uses 5 parameters.
+The accuracy system uses 6 parameters.
+The accuracy system uses 7 parameters.
+The accuracy system uses 8 parameters.
+The accuracy system uses 9 parameters.
+The accuracy system uses 10 parameters.
+The accuracy system uses 11 parameters.
+The accuracy system uses 12 parameters.
+The accuracy system uses 13 parameters.
+The accuracy system uses 14 parameters.
+The accuracy system uses 15 parameters.
+The accuracy system uses 16 parameters.
+The accuracy system uses 17 parameters.
+The accuracy system uses 18 parameters.
+The accuracy system uses 19 parameters.
+The accuracy system uses 20 parameters.
+The accuracy system uses 21 parameters.
+The accuracy system uses 22 parameters.
+The accuracy system uses 23 parameters.
+The accuracy system uses 24 parameters.
+The accuracy system uses 25 parameters.
+The accuracy system uses 26 parameters.
+The accuracy system uses 27 parameters.
+The accuracy system uses 28 parameters.
+The accuracy system uses 29 parameters.
