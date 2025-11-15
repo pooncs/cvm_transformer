@@ -1,0 +1,84 @@
+================================================================================
+COMPREHENSIVE MULTIMODAL NMT VALIDATION REPORT
+================================================================================
+
+OVERALL PERFORMANCE:
+Total Tests: 83
+Perfect Translations: 0
+Perfect Translation Rate: 0.00%
+Average BLEU Score: 0.0000
+Average Execution Time: 0.0000s
+Target 99% Achieved: ❌ NO
+
+PERFORMANCE BY INPUT MODALITY:
+  text:
+    Tests: 23
+    Perfect Rate: 0.00%
+    Average BLEU: 0.0000
+    Average Time: 0.0000s
+  image+text:
+    Tests: 20
+    Perfect Rate: 0.00%
+    Average BLEU: 0.0000
+    Average Time: 0.0000s
+  audio+text:
+    Tests: 20
+    Perfect Rate: 0.00%
+    Average BLEU: 0.0000
+    Average Time: 0.0000s
+  audio+image+text:
+    Tests: 20
+    Perfect Rate: 0.00%
+    Average BLEU: 0.0000
+    Average Time: 0.0000s
+
+PERFORMANCE BY DIFFICULTY:
+  level_1:
+    Tests: 80
+    Perfect Rate: 0.00%
+    Average BLEU: 0.0000
+  level_2:
+    Tests: 2
+    Perfect Rate: 0.00%
+    Average BLEU: 0.0000
+  level_3:
+    Tests: 1
+    Perfect Rate: 0.00%
+    Average BLEU: 0.0000
+
+PERFORMANCE BY DOMAIN:
+  daily_conversation:
+    Tests: 80
+    Perfect Rate: 0.00%
+    Average BLEU: 0.0000
+  narrative:
+    Tests: 1
+    Perfect Rate: 0.00%
+    Average BLEU: 0.0000
+  conditional:
+    Tests: 1
+    Perfect Rate: 0.00%
+    Average BLEU: 0.0000
+  idiom:
+    Tests: 1
+    Perfect Rate: 0.00%
+    Average BLEU: 0.0000
+
+EXAMPLE TRANSLATIONS:
+  Imperfect Translations:
+    Korean: 안녕하세요
+    Expected: Hello
+    Predicted: FAILED
+    BLEU: 0.0000
+
+    Korean: 안녕하세요
+    Expected: Hello
+    Predicted: FAILED
+    BLEU: 0.0000
+
+    Korean: 안녕하세요
+    Expected: Hello
+    Predicted: FAILED
+    BLEU: 0.0000
+
+================================================================================
