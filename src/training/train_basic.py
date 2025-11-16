@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os, sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import time
@@ -27,8 +28,8 @@ class BiTextDataset(Dataset):
 
     def __getitem__(self, idx):
         src, tgt = self.pairs[idx]
-        src_ids = self.tokenizer.encode(src)[:self.max_len]
-        tgt_ids = self.tokenizer.encode(tgt)[:self.max_len]
+        src_ids = self.tokenizer.encode(src)[: self.max_len]
+        tgt_ids = self.tokenizer.encode(tgt)[: self.max_len]
         return {
             "src_ids": torch.tensor(src_ids, dtype=torch.long),
             "tgt_ids": torch.tensor(tgt_ids, dtype=torch.long),
@@ -36,8 +37,12 @@ class BiTextDataset(Dataset):
 
 
 def collate(batch):
-    src_ids = torch.nn.utils.rnn.pad_sequence([b["src_ids"] for b in batch], batch_first=True, padding_value=0)
-    tgt_ids = torch.nn.utils.rnn.pad_sequence([b["tgt_ids"] for b in batch], batch_first=True, padding_value=0)
+    src_ids = torch.nn.utils.rnn.pad_sequence(
+        [b["src_ids"] for b in batch], batch_first=True, padding_value=0
+    )
+    tgt_ids = torch.nn.utils.rnn.pad_sequence(
+        [b["tgt_ids"] for b in batch], batch_first=True, padding_value=0
+    )
     return {"src_ids": src_ids, "tgt_ids": tgt_ids}
 
 
@@ -66,8 +71,12 @@ def setup_logger(log_dir: Path) -> logging.Logger:
 def run_10k_iterations():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     vocab_size = 32000
-    student = CVMTransformer(vocab_size, d_model=768, n_layers=6, core_capacity=64).to(device)
-    teacher = CVMTransformer(vocab_size, d_model=768, n_layers=12, core_capacity=256).to(device)
+    student = CVMTransformer(vocab_size, d_model=768, n_layers=6, core_capacity=64).to(
+        device
+    )
+    teacher = CVMTransformer(
+        vocab_size, d_model=768, n_layers=12, core_capacity=256
+    ).to(device)
 
     base_pairs = [
         ("안녕하세요", "Hello"),
@@ -108,11 +117,15 @@ def run_10k_iterations():
             optimizer.zero_grad()
             s_logits, s_h, s_attn = student(src, return_hidden=True, return_attn=True)
             with torch.no_grad():
-                t_logits, t_h, t_attn = teacher(src, return_hidden=True, return_attn=True)
+                t_logits, t_h, t_attn = teacher(
+                    src, return_hidden=True, return_attn=True
+                )
             # Align target length to student output
-            tgt_aligned = tgt[:, :s_logits.size(1)]
+            tgt_aligned = tgt[:, : s_logits.size(1)]
             ce = torch.nn.functional.cross_entropy(
-                s_logits.reshape(-1, s_logits.size(-1)), tgt_aligned.reshape(-1), ignore_index=0
+                s_logits.reshape(-1, s_logits.size(-1)),
+                tgt_aligned.reshape(-1),
+                ignore_index=0,
             )
             kd = torch.nn.functional.mse_loss(s_logits, t_logits)
             loss = ce + 0.5 * kd
@@ -126,11 +139,22 @@ def run_10k_iterations():
 
             if iters % vconfig.validation_frequency == 0:
                 val_data = [(src_str, tgt_str) for src_str, tgt_str in base_pairs]
-                result = validator.validate_distillation(student, val_data, iters, device=str(device))
-                logger.info(f"validation iter={iters} quality={result.quality_score:.4f}")
+                result = validator.validate_distillation(
+                    student, val_data, iters, device=str(device)
+                )
+                logger.info(
+                    f"validation iter={iters} quality={result.quality_score:.4f}"
+                )
                 # Save checkpoint every 1000 iters
                 ckpt_path = ckpt_dir / f"student_iter_{iters}.pt"
-                torch.save({"model_state": student.state_dict(), "optimizer_state": optimizer.state_dict(), "iters": iters}, ckpt_path)
+                torch.save(
+                    {
+                        "model_state": student.state_dict(),
+                        "optimizer_state": optimizer.state_dict(),
+                        "iters": iters,
+                    },
+                    ckpt_path,
+                )
                 logger.info(f"checkpoint saved to {ckpt_path}")
 
             if iters >= total_iters:
@@ -147,12 +171,20 @@ def run_10k_iterations():
 
     # Save final checkpoint
     final_ckpt_path = ckpt_dir / "student_final.pt"
-    torch.save({"model_state": student.state_dict(), "optimizer_state": optimizer.state_dict(), "iters": iters}, final_ckpt_path)
+    torch.save(
+        {
+            "model_state": student.state_dict(),
+            "optimizer_state": optimizer.state_dict(),
+            "iters": iters,
+        },
+        final_ckpt_path,
+    )
     logger.info(f"final checkpoint saved to {final_ckpt_path}")
 
-    logger.info(f"completed {iters} iterations in {elapsed:.2f}s avg_loss={report['avg_loss']:.6f}")
+    logger.info(
+        f"completed {iters} iterations in {elapsed:.2f}s avg_loss={report['avg_loss']:.6f}"
+    )
 
 
 if __name__ == "__main__":
     run_10k_iterations()
-

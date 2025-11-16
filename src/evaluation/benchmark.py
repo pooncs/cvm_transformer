@@ -8,8 +8,10 @@ def dummy_tokenizer(text):
     class Dummy:
         def encode(self, text):
             return text.strip().split()
+
         def decode(self, ids):
             return ids
+
     return Dummy()
 
 

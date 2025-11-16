@@ -30,17 +30,16 @@ class TranslatorServicer(realtime_translation_pb2_grpc.TranslatorServicer):
         for req in request_iterator:
             self.q.put(req)
             yield realtime_translation_pb2.TranslationResponse(
-                translation="stub",
-                latency_ms=0.0,
-                core_count=0
+                translation="stub", latency_ms=0.0, core_count=0
             )
 
 
 def serve(model, tokenizer, port=50051):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     realtime_translation_pb2_grpc.add_TranslatorServicer_to_server(
-        TranslatorServicer(model, tokenizer), server)
-    server.add_insecure_port(f'[::]:{port}')
+        TranslatorServicer(model, tokenizer), server
+    )
+    server.add_insecure_port(f"[::]:{port}")
     server.start()
     print(f"gRPC server started on port {port}")
     server.wait_for_termination()

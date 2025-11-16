@@ -21,55 +21,49 @@ from src.utils.metrics import BLEUScore, ExactMatchScore, SemanticSimilarity
 
 class SimpleTranslationTest:
     """Simplified test suite for Korean-English translation."""
-    
-    def __init__(
-        self,
-        device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
-    ):
+
+    def __init__(self, device: str = "cuda" if torch.cuda.is_available() else "cpu"):
         self.device = device
-        
+
         # Initialize models
         self.text_model = None
         self.multimodal_model = None
-        
+
         # Metrics
         self.bleu_scorer = BLEUScore()
         self.exact_match_scorer = ExactMatchScore()
         self.semantic_scorer = SemanticSimilarity()
-        
+
         # Test results
-        self.results = {
-            'text_tests': [],
-            'summary': {}
-        }
-        
+        self.results = {"text_tests": [], "summary": {}}
+
         # Create simple models
         self._create_models()
-        
+
     def _create_models(self):
         """Create simple models for testing."""
         vocab_size = 1000  # Small vocab for testing
-        
+
         # Create text model config
         text_config = {
-            'src_vocab_size': vocab_size,
-            'tgt_vocab_size': vocab_size,
-            'd_model': 256,  # Smaller model for testing
-            'n_heads': 4,    # Fewer heads
-            'n_encoder_layers': 2,
-            'n_decoder_layers': 2,
-            'd_ff': 512,
-            'max_len': 64,
-            'dropout': 0.1,
-            'pad_id': 0,
-            'use_flash_attention': False  # Disable flash attention for testing
+            "src_vocab_size": vocab_size,
+            "tgt_vocab_size": vocab_size,
+            "d_model": 256,  # Smaller model for testing
+            "n_heads": 4,  # Fewer heads
+            "n_encoder_layers": 2,
+            "n_decoder_layers": 2,
+            "d_ff": 512,
+            "max_len": 64,
+            "dropout": 0.1,
+            "pad_id": 0,
+            "use_flash_attention": False,  # Disable flash attention for testing
         }
-        
+
         # Create text model
         self.text_model = create_nmt_transformer(text_config)
         self.text_model.to(self.device)
         self.text_model.eval()
-        
+
         # Create multimodal model
         self.multimodal_model = create_multimodal_model(
             src_vocab_size=vocab_size,
@@ -82,31 +76,33 @@ class SimpleTranslationTest:
             max_len=64,
             dropout=0.1,
             pad_id=0,
-            use_flash=False
+            use_flash=False,
         )
         self.multimodal_model.to(self.device)
         self.multimodal_model.eval()
-        
+
         print(f"🆕 Simple models created for testing on {self.device}")
-    
+
     def _simple_tokenize(self, text: str) -> torch.Tensor:
         """Simple tokenization for testing."""
         # Split by spaces and convert to token IDs
         tokens = text.split()
-        token_ids = [hash(token) % 999 + 1 for token in tokens]  # Simple hash-based tokenization
+        token_ids = [
+            hash(token) % 999 + 1 for token in tokens
+        ]  # Simple hash-based tokenization
         if not token_ids:
             token_ids = [1]  # Default token
         return torch.tensor([token_ids], device=self.device)
-    
+
     def _simple_detokenize(self, token_ids: torch.Tensor) -> str:
         """Simple detokenization."""
         tokens = [f"token_{idx.item()}" for idx in token_ids[0] if idx.item() != 0]
         return " ".join(tokens) if tokens else "<empty>"
-    
+
     def run_basic_tests(self) -> Dict[str, Any]:
         """Run basic translation tests."""
         print("📝 Running basic translation tests...")
-        
+
         test_cases = [
             ("안녕하세요", "Hello"),
             ("감사합니다", "Thank you"),
@@ -117,153 +113,156 @@ class SimpleTranslationTest:
             ("학교에 가요", "I'm going to school"),
             ("밥 먹었어요?", "Did you eat?"),
             ("좋은 아침입니다", "Good morning"),
-            ("안녕히 가세요", "Goodbye")
+            ("안녕히 가세요", "Goodbye"),
         ]
-        
+
         text_results = []
-        
+
         for korean_text, expected_translation in test_cases:
             start_time = time.time()
-            
+
             try:
                 # Tokenize input
                 src_tokens = self._simple_tokenize(korean_text)
-                
+
                 # Generate translation using simple generation
                 with torch.no_grad():
                     # Use the model's forward pass
                     batch_size = src_tokens.size(0)
                     device = src_tokens.device
-                    
+
                     # Create a simple target sequence for testing
-                    tgt_tokens = torch.zeros(batch_size, 10, dtype=torch.long, device=device)
+                    tgt_tokens = torch.zeros(
+                        batch_size, 10, dtype=torch.long, device=device
+                    )
                     tgt_tokens[:, 0] = 2  # BOS token
-                    
+
                     # Forward pass
                     output = self.text_model(src_tokens, tgt_tokens)
-                    
+
                     # Get the most likely tokens
                     predicted_tokens = torch.argmax(output, dim=-1)
-                
+
                 # Decode output
                 translation = self._simple_detokenize(predicted_tokens)
-                
+
                 # Calculate metrics (simplified)
                 bleu_score = self.bleu_scorer([expected_translation], [translation])
                 exact_match = self.exact_match_scorer(expected_translation, translation)
                 semantic_sim = self.semantic_scorer(expected_translation, translation)
-                
+
                 execution_time = time.time() - start_time
-                
+
                 result = {
-                    'input': korean_text,
-                    'expected': expected_translation,
-                    'predicted': translation,
-                    'bleu_score': bleu_score,
-                    'exact_match': exact_match,
-                    'semantic_similarity': semantic_sim,
-                    'execution_time': execution_time,
-                    'perfect_translation': bleu_score > 0.5,  # Lower threshold for testing
-                    'test_type': 'text'
+                    "input": korean_text,
+                    "expected": expected_translation,
+                    "predicted": translation,
+                    "bleu_score": bleu_score,
+                    "exact_match": exact_match,
+                    "semantic_similarity": semantic_sim,
+                    "execution_time": execution_time,
+                    "perfect_translation": bleu_score
+                    > 0.5,  # Lower threshold for testing
+                    "test_type": "text",
                 }
-                
+
                 text_results.append(result)
                 print(f"✅ {korean_text} → {translation} (BLEU: {bleu_score:.3f})")
-                
+
             except Exception as e:
                 print(f"❌ Error testing '{korean_text}': {e}")
                 result = {
-                    'input': korean_text,
-                    'expected': expected_translation,
-                    'predicted': "ERROR",
-                    'bleu_score': 0.0,
-                    'exact_match': 0,
-                    'semantic_similarity': 0.0,
-                    'execution_time': time.time() - start_time,
-                    'perfect_translation': False,
-                    'test_type': 'text',
-                    'error': str(e)
+                    "input": korean_text,
+                    "expected": expected_translation,
+                    "predicted": "ERROR",
+                    "bleu_score": 0.0,
+                    "exact_match": 0,
+                    "semantic_similarity": 0.0,
+                    "execution_time": time.time() - start_time,
+                    "perfect_translation": False,
+                    "test_type": "text",
+                    "error": str(e),
                 }
                 text_results.append(result)
-        
+
         return {
-            'test_type': 'text',
-            'total_tests': len(text_results),
-            'results': text_results,
-            'average_bleu': np.mean([r['bleu_score'] for r in text_results]),
-            'perfect_rate': np.mean([r['perfect_translation'] for r in text_results]),
-            'average_time': np.mean([r['execution_time'] for r in text_results])
+            "test_type": "text",
+            "total_tests": len(text_results),
+            "results": text_results,
+            "average_bleu": np.mean([r["bleu_score"] for r in text_results]),
+            "perfect_rate": np.mean([r["perfect_translation"] for r in text_results]),
+            "average_time": np.mean([r["execution_time"] for r in text_results]),
         }
-    
+
     def run_comprehensive_tests(self) -> Dict[str, Any]:
         """Run comprehensive tests."""
         print("🚀 Starting comprehensive translation tests...")
         start_time = time.time()
-        
+
         # Run text tests
         text_results = self.run_basic_tests()
-        
+
         # Compile results
-        all_results = {
-            'text': text_results
-        }
-        
+        all_results = {"text": text_results}
+
         # Calculate overall statistics
-        total_tests = text_results['total_tests']
-        overall_bleu = text_results['average_bleu']
-        overall_perfect_rate = text_results['perfect_rate']
+        total_tests = text_results["total_tests"]
+        overall_bleu = text_results["average_bleu"]
+        overall_perfect_rate = text_results["perfect_rate"]
         total_time = time.time() - start_time
-        
+
         summary = {
-            'total_tests': total_tests,
-            'overall_average_bleu': overall_bleu,
-            'overall_perfect_translation_rate': overall_perfect_rate,
-            'total_execution_time': total_time,
-            'tests_per_second': total_tests / total_time,
-            'target_achieved': overall_perfect_rate >= 0.99,
-            'improvement_needed': max(0.0, 0.99 - overall_perfect_rate)
+            "total_tests": total_tests,
+            "overall_average_bleu": overall_bleu,
+            "overall_perfect_translation_rate": overall_perfect_rate,
+            "total_execution_time": total_time,
+            "tests_per_second": total_tests / total_time,
+            "target_achieved": overall_perfect_rate >= 0.99,
+            "improvement_needed": max(0.0, 0.99 - overall_perfect_rate),
         }
-        
+
         # Store results
         self.results = {
-            'test_results': all_results,
-            'summary': summary,
-            'timestamp': datetime.now().isoformat()
+            "test_results": all_results,
+            "summary": summary,
+            "timestamp": datetime.now().isoformat(),
         }
-        
+
         # Print summary
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("COMPREHENSIVE TRANSLATION TEST SUMMARY")
-        print("="*80)
+        print("=" * 80)
         print(f"Total Tests: {total_tests}")
         print(f"Overall Average BLEU Score: {overall_bleu:.4f}")
         print(f"Perfect Translation Rate: {overall_perfect_rate:.2%}")
-        print(f"Target (99%) Achieved: {'✅ YES' if overall_perfect_rate >= 0.99 else '❌ NO'}")
+        print(
+            f"Target (99%) Achieved: {'✅ YES' if overall_perfect_rate >= 0.99 else '❌ NO'}"
+        )
         print(f"Total Execution Time: {total_time:.2f} seconds")
         print(f"Tests per Second: {total_tests / total_time:.2f}")
         print(f"Improvement Needed: {max(0.0, 0.99 - overall_perfect_rate):.2%}")
-        print("="*80)
-        
+        print("=" * 80)
+
         return self.results
-    
+
     def generate_report(self, output_dir: str = "tests/comprehensive/reports"):
         """Generate detailed report."""
         os.makedirs(output_dir, exist_ok=True)
-        
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         report_path = os.path.join(output_dir, f"simple_test_report_{timestamp}.html")
-        
+
         # Create simple HTML report
         html_content = self._generate_html_report()
-        
-        with open(report_path, 'w', encoding='utf-8') as f:
+
+        with open(report_path, "w", encoding="utf-8") as f:
             f.write(html_content)
-        
+
         print(f"📊 Detailed report saved to: {report_path}")
-        
+
         # Save JSON results
         json_path = os.path.join(output_dir, f"simple_results_{timestamp}.json")
-        
+
         def convert_numpy_types(obj):
             """Convert numpy types to Python types for JSON serialization."""
             if isinstance(obj, np.integer):
@@ -279,20 +278,20 @@ class SimpleTranslationTest:
             elif isinstance(obj, list):
                 return [convert_numpy_types(item) for item in obj]
             return obj
-        
+
         json_serializable_results = convert_numpy_types(self.results)
-        
-        with open(json_path, 'w', encoding='utf-8') as f:
+
+        with open(json_path, "w", encoding="utf-8") as f:
             json.dump(json_serializable_results, f, ensure_ascii=False, indent=2)
-        
+
         print(f"📋 Detailed results saved to: {json_path}")
-        
+
         return report_path, json_path
-    
+
     def _generate_html_report(self) -> str:
         """Generate HTML report content."""
-        summary = self.results['summary']
-        
+        summary = self.results["summary"]
+
         html = f"""
         <!DOCTYPE html>
         <html lang="en">
@@ -360,9 +359,9 @@ class SimpleTranslationTest:
                     </div>
                 </div>
         """
-        
+
         # Add detailed results
-        text_results = self.results['test_results']['text']
+        text_results = self.results["test_results"]["text"]
         html += f"""
                 <div class="test-section">
                     <h3>📝 Text Translation Tests</h3>
@@ -371,18 +370,20 @@ class SimpleTranslationTest:
                        <strong>Perfect Rate:</strong> {text_results['perfect_rate']:.1%} | 
                        <strong>Avg Time:</strong> {text_results['average_time']:.3f}s</p>
         """
-        
+
         # Show all results
-        for result in text_results['results']:
-            perfect_class = "perfect" if result.get('perfect_translation', False) else ""
-            error_class = "error" if 'error' in result else ""
-            
-            bleu_class = (
-                'bleu-high' if result['bleu_score'] > 0.7 else
-                'bleu-medium' if result['bleu_score'] > 0.4 else
-                'bleu-low'
+        for result in text_results["results"]:
+            perfect_class = (
+                "perfect" if result.get("perfect_translation", False) else ""
             )
-            
+            error_class = "error" if "error" in result else ""
+
+            bleu_class = (
+                "bleu-high"
+                if result["bleu_score"] > 0.7
+                else "bleu-medium" if result["bleu_score"] > 0.4 else "bleu-low"
+            )
+
             html += f"""
                     <div class="test-result {perfect_class} {error_class}">
                         <strong>Input:</strong> <span class="korean">{result['input']}</span><br>
@@ -394,7 +395,7 @@ class SimpleTranslationTest:
                         <strong>Time:</strong> {result['execution_time']:.3f}s
                     </div>
             """
-        
+
         html += """
                 </div>
                 
@@ -420,29 +421,29 @@ class SimpleTranslationTest:
         </body>
         </html>
         """
-        
+
         return html
 
 
 def main():
     """Main function to run simple translation tests."""
     print("🚀 Starting Simple Translation Validation Suite")
-    
+
     # Initialize test suite
     test_suite = SimpleTranslationTest(
-        device='cuda' if torch.cuda.is_available() else 'cpu'
+        device="cuda" if torch.cuda.is_available() else "cpu"
     )
-    
+
     # Run comprehensive tests
     results = test_suite.run_comprehensive_tests()
-    
+
     # Generate report
     report_path, json_path = test_suite.generate_report()
-    
+
     print(f"\n🎉 Testing completed!")
     print(f"📊 Report: {report_path}")
     print(f"📋 Results: {json_path}")
-    
+
     return results
 
 

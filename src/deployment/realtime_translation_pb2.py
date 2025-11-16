@@ -9,32 +9,35 @@ from google.protobuf import descriptor_pool as _descriptor_pool
 from google.protobuf import runtime_version as _runtime_version
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import builder as _builder
+
 _runtime_version.ValidateProtobufRuntimeVersion(
     _runtime_version.Domain.PUBLIC,
     6,
     31,
     1,
-    '',
-    'cvm_translator/realtime_translation.proto'
+    "",
+    "cvm_translator/realtime_translation.proto",
 )
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
 
 
-
-
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n)cvm_translator/realtime_translation.proto\"5\n\x12TranslationRequest\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x11\n\tdirection\x18\x02 \x01(\t\"R\n\x13TranslationResponse\x12\x13\n\x0btranslation\x18\x01 \x01(\t\x12\x12\n\nlatency_ms\x18\x02 \x01(\x01\x12\x12\n\ncore_count\x18\x03 \x01(\x05\x32N\n\nTranslator\x12@\n\x0fStreamTranslate\x12\x13.TranslationRequest\x1a\x14.TranslationResponse(\x01\x30\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
+    b'\n)cvm_translator/realtime_translation.proto"5\n\x12TranslationRequest\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x11\n\tdirection\x18\x02 \x01(\t"R\n\x13TranslationResponse\x12\x13\n\x0btranslation\x18\x01 \x01(\t\x12\x12\n\nlatency_ms\x18\x02 \x01(\x01\x12\x12\n\ncore_count\x18\x03 \x01(\x05\x32N\n\nTranslator\x12@\n\x0fStreamTranslate\x12\x13.TranslationRequest\x1a\x14.TranslationResponse(\x01\x30\x01\x62\x06proto3'
+)
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
-_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'cvm_translator.realtime_translation_pb2', _globals)
+_builder.BuildTopDescriptorsAndMessages(
+    DESCRIPTOR, "cvm_translator.realtime_translation_pb2", _globals
+)
 if not _descriptor._USE_C_DESCRIPTORS:
-  DESCRIPTOR._loaded_options = None
-  _globals['_TRANSLATIONREQUEST']._serialized_start=45
-  _globals['_TRANSLATIONREQUEST']._serialized_end=98
-  _globals['_TRANSLATIONRESPONSE']._serialized_start=100
-  _globals['_TRANSLATIONRESPONSE']._serialized_end=182
-  _globals['_TRANSLATOR']._serialized_start=184
-  _globals['_TRANSLATOR']._serialized_end=262
+    DESCRIPTOR._loaded_options = None
+    _globals["_TRANSLATIONREQUEST"]._serialized_start = 45
+    _globals["_TRANSLATIONREQUEST"]._serialized_end = 98
+    _globals["_TRANSLATIONRESPONSE"]._serialized_start = 100
+    _globals["_TRANSLATIONRESPONSE"]._serialized_end = 182
+    _globals["_TRANSLATOR"]._serialized_start = 184
+    _globals["_TRANSLATOR"]._serialized_end = 262
 # @@protoc_insertion_point(module_scope)

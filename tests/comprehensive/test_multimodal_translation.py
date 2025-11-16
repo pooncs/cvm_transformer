@@ -30,71 +30,75 @@ from src.utils.metrics import BLEUScore, ExactMatchScore, SemanticSimilarity
 
 class MultimodalTestSuite:
     """Comprehensive test suite for Korean-English translation with multimodal inputs."""
-    
+
     def __init__(
         self,
         model_path: str,
         tokenizer_path: str,
-        device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
+        device: str = "cuda" if torch.cuda.is_available() else "cpu",
     ):
         self.device = device
         self.model_path = model_path
         self.tokenizer_path = tokenizer_path
-        
+
         # Initialize models
         self.text_model = None
         self.multimodal_model = None
         self.tokenizer = None
-        
+
         # Metrics
         self.bleu_scorer = BLEUScore()
         self.exact_match_scorer = ExactMatchScore()
         self.semantic_scorer = SemanticSimilarity()
-        
+
         # Test results
         self.results = {
-            'text_tests': [],
-            'image_tests': [],
-            'audio_tests': [],
-            'multimodal_tests': [],
-            'summary': {}
+            "text_tests": [],
+            "image_tests": [],
+            "audio_tests": [],
+            "multimodal_tests": [],
+            "summary": {},
         }
-        
+
         # Load models and tokenizer
         self._load_models()
-        
+
     def _load_models(self):
         """Load pre-trained models and tokenizer."""
         try:
             # Load tokenizer
             self.tokenizer = torch.load(self.tokenizer_path, map_location=self.device)
-            
+
             # Load text model
-            checkpoint = torch.load(f"{self.model_path}/text_model_best.pt", map_location=self.device)
-            vocab_size = checkpoint['vocab_size']
-            
+            checkpoint = torch.load(
+                f"{self.model_path}/text_model_best.pt", map_location=self.device
+            )
+            vocab_size = checkpoint["vocab_size"]
+
             # Create text model config
             text_config = {
-                'src_vocab_size': vocab_size,
-                'tgt_vocab_size': vocab_size,
-                'd_model': 1024,
-                'n_heads': 16,
-                'n_encoder_layers': 12,
-                'n_decoder_layers': 12,
-                'd_ff': 4096,
-                'max_len': 512,
-                'dropout': 0.1,
-                'pad_id': 0,
-                'use_flash_attention': True
+                "src_vocab_size": vocab_size,
+                "tgt_vocab_size": vocab_size,
+                "d_model": 1024,
+                "n_heads": 16,
+                "n_encoder_layers": 12,
+                "n_decoder_layers": 12,
+                "d_ff": 4096,
+                "max_len": 512,
+                "dropout": 0.1,
+                "pad_id": 0,
+                "use_flash_attention": True,
             }
-            
+
             self.text_model = create_nmt_model(text_config)
-            self.text_model.load_state_dict(checkpoint['model_state_dict'])
+            self.text_model.load_state_dict(checkpoint["model_state_dict"])
             self.text_model.to(self.device)
             self.text_model.eval()
-            
+
             # Load multimodal model
-            multimodal_checkpoint = torch.load(f"{self.model_path}/multimodal_model_best.pt", map_location=self.device)
+            multimodal_checkpoint = torch.load(
+                f"{self.model_path}/multimodal_model_best.pt", map_location=self.device
+            )
             self.multimodal_model = create_multimodal_model(
                 src_vocab_size=vocab_size,
                 tgt_vocab_size=vocab_size,
@@ -106,42 +110,44 @@ class MultimodalTestSuite:
                 max_len=512,
                 dropout=0.1,
                 pad_id=0,
-                use_flash=True
+                use_flash=True,
             )
-            self.multimodal_model.load_state_dict(multimodal_checkpoint['model_state_dict'])
+            self.multimodal_model.load_state_dict(
+                multimodal_checkpoint["model_state_dict"]
+            )
             self.multimodal_model.to(self.device)
             self.multimodal_model.eval()
-            
+
             print(f"✅ Models loaded successfully on {self.device}")
-            
+
         except Exception as e:
             print(f"❌ Error loading models: {e}")
             print("Creating new models for testing...")
             self._create_new_models()
-    
+
     def _create_new_models(self):
         """Create new models for testing when pre-trained models are not available."""
         vocab_size = 32000  # Default vocab size
-        
+
         # Create text model config
         text_config = {
-            'src_vocab_size': vocab_size,
-            'tgt_vocab_size': vocab_size,
-            'd_model': 1024,
-            'n_heads': 16,
-            'n_encoder_layers': 12,
-            'n_decoder_layers': 12,
-            'd_ff': 4096,
-            'max_len': 512,
-            'dropout': 0.1,
-            'pad_id': 0,
-            'use_flash_attention': True
+            "src_vocab_size": vocab_size,
+            "tgt_vocab_size": vocab_size,
+            "d_model": 1024,
+            "n_heads": 16,
+            "n_encoder_layers": 12,
+            "n_decoder_layers": 12,
+            "d_ff": 4096,
+            "max_len": 512,
+            "dropout": 0.1,
+            "pad_id": 0,
+            "use_flash_attention": True,
         }
-        
+
         # Create text model
         self.text_model = create_nmt_model(text_config)
         self.text_model.to(self.device)
-        
+
         # Create multimodal model
         self.multimodal_model = create_multimodal_model(
             src_vocab_size=vocab_size,
@@ -154,31 +160,33 @@ class MultimodalTestSuite:
             max_len=512,
             dropout=0.1,
             pad_id=0,
-            use_flash=True
+            use_flash=True,
         )
         self.multimodal_model.to(self.device)
-        
+
         print("🆕 New models created for testing")
-    
+
     def _tokenize(self, text: str) -> torch.Tensor:
         """Tokenize text using the loaded tokenizer."""
         if self.tokenizer is None:
             # Fallback tokenization
             tokens = text.split()
-            token_ids = [hash(token) % 30000 + 1 for token in tokens]  # Simple hash-based tokenization
+            token_ids = [
+                hash(token) % 30000 + 1 for token in tokens
+            ]  # Simple hash-based tokenization
             return torch.tensor([token_ids], device=self.device)
-        
-        return self.tokenizer.encode(text, return_tensors='pt').to(self.device)
-    
+
+        return self.tokenizer.encode(text, return_tensors="pt").to(self.device)
+
     def _detokenize(self, token_ids: torch.Tensor) -> str:
         """Detokenize token IDs back to text."""
         if self.tokenizer is None:
             # Fallback detokenization
             tokens = [f"token_{idx.item()}" for idx in token_ids[0]]
             return " ".join(tokens)
-        
+
         return self.tokenizer.decode(token_ids[0], skip_special_tokens=True)
-    
+
     def generate_test_images(self) -> List[Tuple[np.ndarray, str, str]]:
         """Generate synthetic test images with Korean text."""
         test_cases = [
@@ -191,16 +199,16 @@ class MultimodalTestSuite:
             ("좋은 아침입니다", "Good morning", "Morning greeting"),
             ("안녕히 가세요", "Goodbye", "Farewell"),
             ("죄송합니다", "I'm sorry", "Apology"),
-            ("축하합니다", "Congratulations", "Congratulations")
+            ("축하합니다", "Congratulations", "Congratulations"),
         ]
-        
+
         images_with_text = []
-        
+
         for korean_text, english_translation, description in test_cases:
             # Create image with Korean text
-            img = Image.new('RGB', (224, 224), color='white')
+            img = Image.new("RGB", (224, 224), color="white")
             draw = ImageDraw.Draw(img)
-            
+
             # Try to use a Korean font, fallback to default
             try:
                 font = ImageFont.truetype("malgun.ttf", 24)
@@ -209,7 +217,7 @@ class MultimodalTestSuite:
                     font = ImageFont.load_default()
                 except:
                     font = None
-            
+
             # Draw text
             if font:
                 # Center the text
@@ -218,29 +226,29 @@ class MultimodalTestSuite:
                 text_height = bbox[3] - bbox[1]
                 x = (224 - text_width) // 2
                 y = (224 - text_height) // 2
-                draw.text((x, y), korean_text, font=font, fill='black')
+                draw.text((x, y), korean_text, font=font, fill="black")
             else:
                 # Fallback: draw rectangles to simulate text
                 for i, char in enumerate(korean_text):
                     x = 20 + (i % 8) * 25
                     y = 50 + (i // 8) * 30
-                    draw.rectangle([x, y, x+20, y+20], fill='black')
-            
+                    draw.rectangle([x, y, x + 20, y + 20], fill="black")
+
             # Add some noise and variations
             img_array = np.array(img)
-            
+
             # Add slight rotation
             if np.random.random() > 0.5:
                 img_array = np.rot90(img_array, k=np.random.randint(0, 4))
-            
+
             # Add brightness variation
             brightness_factor = np.random.uniform(0.8, 1.2)
             img_array = np.clip(img_array * brightness_factor, 0, 255).astype(np.uint8)
-            
+
             images_with_text.append((img_array, english_translation, description))
-        
+
         return images_with_text
-    
+
     def generate_test_audio(self) -> List[Tuple[np.ndarray, str, str]]:
         """Generate synthetic test audio with Korean speech patterns."""
         test_cases = [
@@ -248,33 +256,33 @@ class MultimodalTestSuite:
             ("감사합니다", "Thank you", "Expression of gratitude"),
             ("사랑해요", "I love you", "Expression of love"),
             ("오늘 날씨가 좋네요", "The weather is nice today", "Weather description"),
-            ("학교에 가요", "I'm going to school", "Daily activity")
+            ("학교에 가요", "I'm going to school", "Daily activity"),
         ]
-        
+
         audio_samples = []
-        
+
         for korean_text, english_translation, description in test_cases:
             # Generate synthetic speech-like signal
             duration = len(korean_text) * 0.2  # Rough duration estimate
             sample_rate = 16000
             t = np.linspace(0, duration, int(sample_rate * duration))
-            
+
             # Create multiple harmonics to simulate speech
             fundamental = 100 + np.random.randint(-20, 20)  # Base frequency
             signal = np.zeros_like(t)
-            
+
             # Add harmonics
             for harmonic in range(1, 6):
                 freq = fundamental * harmonic
                 amplitude = 1.0 / harmonic
                 phase = np.random.uniform(0, 2 * np.pi)
                 signal += amplitude * np.sin(2 * np.pi * freq * t + phase)
-            
+
             # Add formant-like frequency modulation
             formant_freq = 2000 + np.random.randint(-500, 500)
             formant = 0.3 * np.sin(2 * np.pi * formant_freq * t)
             signal += formant
-            
+
             # Add envelope to simulate syllables
             envelope = np.ones_like(t)
             syllable_duration = 0.2
@@ -286,24 +294,24 @@ class MultimodalTestSuite:
                     syllable_env = np.linspace(0, 1, end_idx - start_idx)
                     syllable_env *= np.linspace(1, 0.3, end_idx - start_idx)
                     envelope[start_idx:end_idx] = syllable_env
-            
+
             signal *= envelope
-            
+
             # Add noise
             noise = np.random.normal(0, 0.05, signal.shape)
             signal += noise
-            
+
             # Normalize
             signal = signal / np.max(np.abs(signal))
-            
+
             audio_samples.append((signal, english_translation, description))
-        
+
         return audio_samples
-    
+
     def run_text_tests(self) -> Dict[str, Any]:
         """Run comprehensive text-based translation tests."""
         print("📝 Running text translation tests...")
-        
+
         test_cases = [
             # Basic phrases
             ("안녕하세요", "Hello"),
@@ -311,44 +319,50 @@ class MultimodalTestSuite:
             ("사랑해요", "I love you"),
             ("죄송합니다", "I'm sorry"),
             ("축하합니다", "Congratulations"),
-            
             # Complex sentences
             ("오늘 날씨가 정말 좋네요.", "The weather is really nice today."),
             ("학교에 가서 친구들을 만났어요.", "I went to school and met my friends."),
             ("밥을 먹고 나서 공부를 했어요.", "After eating, I studied."),
             ("주말에 영화를 봤어요.", "I watched a movie on the weekend."),
             ("한국어를 배우고 싶어요.", "I want to learn Korean."),
-            
             # Domain-specific
-            ("이 약은 하루에 세 번 복용하세요.", "Take this medicine three times a day."),
+            (
+                "이 약은 하루에 세 번 복용하세요.",
+                "Take this medicine three times a day.",
+            ),
             ("회의는 오후 3시에 시작합니다.", "The meeting starts at 3 PM."),
-            ("이 제품은 100% 천연 재료로 만들어졌습니다.", "This product is made with 100% natural ingredients."),
+            (
+                "이 제품은 100% 천연 재료로 만들어졌습니다.",
+                "This product is made with 100% natural ingredients.",
+            ),
             ("비행기가 30분 후에 출발합니다.", "The plane departs in 30 minutes."),
-            ("이 책은 한국 역사에 대해 설명합니다.", "This book explains Korean history."),
-            
+            (
+                "이 책은 한국 역사에 대해 설명합니다.",
+                "This book explains Korean history.",
+            ),
             # Colloquial expressions
             ("어떻게 지내세요?", "How are you?"),
             ("별일 없지요?", "Nothing special?"),
             ("맛있게 드세요.", "Enjoy your meal."),
             ("들어오세요.", "Please come in."),
-            ("조심해서 가세요.", "Go carefully.")
+            ("조심해서 가세요.", "Go carefully."),
         ]
-        
+
         text_results = []
-        
+
         for korean_text, expected_translation in test_cases:
             start_time = time.time()
-            
+
             try:
                 # Tokenize input
                 src_tokens = self._tokenize(korean_text)
-                
+
                 # Generate translation
                 with torch.no_grad():
                     # Get encoder output first
                     src_mask = self.text_model.create_padding_mask(src_tokens)
                     encoder_out = self.text_model.encoder(src_tokens, src_mask)
-                    
+
                     # Generate using encoder output
                     generated = self.text_model.generate(
                         encoder_out,
@@ -357,80 +371,82 @@ class MultimodalTestSuite:
                         device=src_tokens.device,
                         max_len=len(expected_translation.split()) + 10,
                         beam_size=4,
-                        temperature=0.8
+                        temperature=0.8,
                     )
-                
+
                 # Decode output
                 translation = self._detokenize(generated)
-                
+
                 # Calculate metrics
                 bleu_score = self.bleu_scorer([expected_translation], [translation])
                 exact_match = self.exact_match_scorer(expected_translation, translation)
                 semantic_sim = self.semantic_scorer(expected_translation, translation)
-                
+
                 execution_time = time.time() - start_time
-                
+
                 result = {
-                    'input': korean_text,
-                    'expected': expected_translation,
-                    'predicted': translation,
-                    'bleu_score': bleu_score,
-                    'exact_match': exact_match,
-                    'semantic_similarity': semantic_sim,
-                    'execution_time': execution_time,
-                    'perfect_translation': bleu_score > 0.8 and exact_match == 1.0,
-                    'test_type': 'text'
+                    "input": korean_text,
+                    "expected": expected_translation,
+                    "predicted": translation,
+                    "bleu_score": bleu_score,
+                    "exact_match": exact_match,
+                    "semantic_similarity": semantic_sim,
+                    "execution_time": execution_time,
+                    "perfect_translation": bleu_score > 0.8 and exact_match == 1.0,
+                    "test_type": "text",
                 }
-                
+
                 text_results.append(result)
-                
+
                 print(f"✅ {korean_text} → {translation} (BLEU: {bleu_score:.3f})")
-                
+
             except Exception as e:
                 print(f"❌ Error testing '{korean_text}': {e}")
                 result = {
-                    'input': korean_text,
-                    'expected': expected_translation,
-                    'predicted': "ERROR",
-                    'bleu_score': 0.0,
-                    'exact_match': 0,
-                    'semantic_similarity': 0.0,
-                    'execution_time': time.time() - start_time,
-                    'perfect_translation': False,
-                    'test_type': 'text',
-                    'error': str(e)
+                    "input": korean_text,
+                    "expected": expected_translation,
+                    "predicted": "ERROR",
+                    "bleu_score": 0.0,
+                    "exact_match": 0,
+                    "semantic_similarity": 0.0,
+                    "execution_time": time.time() - start_time,
+                    "perfect_translation": False,
+                    "test_type": "text",
+                    "error": str(e),
                 }
                 text_results.append(result)
-        
+
         return {
-            'test_type': 'text',
-            'total_tests': len(text_results),
-            'results': text_results,
-            'average_bleu': np.mean([r['bleu_score'] for r in text_results]),
-            'perfect_rate': np.mean([r['perfect_translation'] for r in text_results]),
-            'average_time': np.mean([r['execution_time'] for r in text_results])
+            "test_type": "text",
+            "total_tests": len(text_results),
+            "results": text_results,
+            "average_bleu": np.mean([r["bleu_score"] for r in text_results]),
+            "perfect_rate": np.mean([r["perfect_translation"] for r in text_results]),
+            "average_time": np.mean([r["execution_time"] for r in text_results]),
         }
-    
+
     def run_image_tests(self) -> Dict[str, Any]:
         """Run image-based translation tests."""
         print("🖼️ Running image translation tests...")
-        
+
         # Generate test images
         test_images = self.generate_test_images()
         image_results = []
-        
+
         for image_array, expected_translation, description in test_images:
             start_time = time.time()
-            
+
             try:
                 # Convert image to tensor
-                image_tensor = torch.from_numpy(image_array).permute(2, 0, 1).float() / 255.0
+                image_tensor = (
+                    torch.from_numpy(image_array).permute(2, 0, 1).float() / 255.0
+                )
                 image_tensor = image_tensor.unsqueeze(0).to(self.device)
-                
+
                 # Create dummy text input (since we need both text and image)
                 dummy_text = "image"
                 src_tokens = self._tokenize(dummy_text)
-                
+
                 # Generate translation using multimodal model
                 with torch.no_grad():
                     generated = self.multimodal_model.generate(
@@ -438,81 +454,85 @@ class MultimodalTestSuite:
                         src_images=image_tensor,
                         max_len=len(expected_translation.split()) + 10,
                         beam_size=4,
-                        temperature=0.8
+                        temperature=0.8,
                     )
-                
+
                 # Decode output
                 translation = self._detokenize(generated)
-                
+
                 # Calculate metrics
                 bleu_score = self.bleu_scorer([expected_translation], [translation])
                 exact_match = self.exact_match_scorer(expected_translation, translation)
                 semantic_sim = self.semantic_scorer(expected_translation, translation)
-                
+
                 execution_time = time.time() - start_time
-                
+
                 result = {
-                    'input_image_shape': image_array.shape,
-                    'expected': expected_translation,
-                    'predicted': translation,
-                    'description': description,
-                    'bleu_score': bleu_score,
-                    'exact_match': exact_match,
-                    'semantic_similarity': semantic_sim,
-                    'execution_time': execution_time,
-                    'perfect_translation': bleu_score > 0.8 and exact_match == 1.0,
-                    'test_type': 'image'
+                    "input_image_shape": image_array.shape,
+                    "expected": expected_translation,
+                    "predicted": translation,
+                    "description": description,
+                    "bleu_score": bleu_score,
+                    "exact_match": exact_match,
+                    "semantic_similarity": semantic_sim,
+                    "execution_time": execution_time,
+                    "perfect_translation": bleu_score > 0.8 and exact_match == 1.0,
+                    "test_type": "image",
                 }
-                
+
                 image_results.append(result)
-                print(f"🖼️ Image test: {description} → {translation} (BLEU: {bleu_score:.3f})")
-                
+                print(
+                    f"🖼️ Image test: {description} → {translation} (BLEU: {bleu_score:.3f})"
+                )
+
             except Exception as e:
                 print(f"❌ Error in image test '{description}': {e}")
                 result = {
-                    'input_image_shape': image_array.shape,
-                    'expected': expected_translation,
-                    'predicted': "ERROR",
-                    'description': description,
-                    'bleu_score': 0.0,
-                    'exact_match': 0,
-                    'semantic_similarity': 0.0,
-                    'execution_time': time.time() - start_time,
-                    'perfect_translation': False,
-                    'test_type': 'image',
-                    'error': str(e)
+                    "input_image_shape": image_array.shape,
+                    "expected": expected_translation,
+                    "predicted": "ERROR",
+                    "description": description,
+                    "bleu_score": 0.0,
+                    "exact_match": 0,
+                    "semantic_similarity": 0.0,
+                    "execution_time": time.time() - start_time,
+                    "perfect_translation": False,
+                    "test_type": "image",
+                    "error": str(e),
                 }
                 image_results.append(result)
-        
+
         return {
-            'test_type': 'image',
-            'total_tests': len(image_results),
-            'results': image_results,
-            'average_bleu': np.mean([r['bleu_score'] for r in image_results]),
-            'perfect_rate': np.mean([r['perfect_translation'] for r in image_results]),
-            'average_time': np.mean([r['execution_time'] for r in image_results])
+            "test_type": "image",
+            "total_tests": len(image_results),
+            "results": image_results,
+            "average_bleu": np.mean([r["bleu_score"] for r in image_results]),
+            "perfect_rate": np.mean([r["perfect_translation"] for r in image_results]),
+            "average_time": np.mean([r["execution_time"] for r in image_results]),
         }
-    
+
     def run_audio_tests(self) -> Dict[str, Any]:
         """Run audio-based translation tests."""
         print("🎵 Running audio translation tests...")
-        
+
         # Generate test audio
         test_audio = self.generate_test_audio()
         audio_results = []
-        
+
         for audio_signal, expected_translation, description in test_audio:
             start_time = time.time()
-            
+
             try:
                 # Convert audio to tensor
-                audio_tensor = torch.from_numpy(audio_signal).float().unsqueeze(0).unsqueeze(0)
+                audio_tensor = (
+                    torch.from_numpy(audio_signal).float().unsqueeze(0).unsqueeze(0)
+                )
                 audio_tensor = audio_tensor.to(self.device)
-                
+
                 # Create dummy text input
                 dummy_text = "audio"
                 src_tokens = self._tokenize(dummy_text)
-                
+
                 # Generate translation using multimodal model
                 with torch.no_grad():
                     generated = self.multimodal_model.generate(
@@ -520,244 +540,271 @@ class MultimodalTestSuite:
                         src_audio=audio_tensor,
                         max_len=len(expected_translation.split()) + 10,
                         beam_size=4,
-                        temperature=0.8
+                        temperature=0.8,
                     )
-                
+
                 # Decode output
                 translation = self._detokenize(generated)
-                
+
                 # Calculate metrics
                 bleu_score = self.bleu_scorer([expected_translation], [translation])
                 exact_match = self.exact_match_scorer(expected_translation, translation)
                 semantic_sim = self.semantic_scorer(expected_translation, translation)
-                
+
                 execution_time = time.time() - start_time
-                
+
                 result = {
-                    'input_audio_shape': audio_signal.shape,
-                    'expected': expected_translation,
-                    'predicted': translation,
-                    'description': description,
-                    'bleu_score': bleu_score,
-                    'exact_match': exact_match,
-                    'semantic_similarity': semantic_sim,
-                    'execution_time': execution_time,
-                    'perfect_translation': bleu_score > 0.8 and exact_match == 1.0,
-                    'test_type': 'audio'
+                    "input_audio_shape": audio_signal.shape,
+                    "expected": expected_translation,
+                    "predicted": translation,
+                    "description": description,
+                    "bleu_score": bleu_score,
+                    "exact_match": exact_match,
+                    "semantic_similarity": semantic_sim,
+                    "execution_time": execution_time,
+                    "perfect_translation": bleu_score > 0.8 and exact_match == 1.0,
+                    "test_type": "audio",
                 }
-                
+
                 audio_results.append(result)
-                print(f"🎵 Audio test: {description} → {translation} (BLEU: {bleu_score:.3f})")
-                
+                print(
+                    f"🎵 Audio test: {description} → {translation} (BLEU: {bleu_score:.3f})"
+                )
+
             except Exception as e:
                 print(f"❌ Error in audio test '{description}': {e}")
                 result = {
-                    'input_audio_shape': audio_signal.shape,
-                    'expected': expected_translation,
-                    'predicted': "ERROR",
-                    'description': description,
-                    'bleu_score': 0.0,
-                    'exact_match': 0,
-                    'semantic_similarity': 0.0,
-                    'execution_time': time.time() - start_time,
-                    'perfect_translation': False,
-                    'test_type': 'audio',
-                    'error': str(e)
+                    "input_audio_shape": audio_signal.shape,
+                    "expected": expected_translation,
+                    "predicted": "ERROR",
+                    "description": description,
+                    "bleu_score": 0.0,
+                    "exact_match": 0,
+                    "semantic_similarity": 0.0,
+                    "execution_time": time.time() - start_time,
+                    "perfect_translation": False,
+                    "test_type": "audio",
+                    "error": str(e),
                 }
                 audio_results.append(result)
-        
+
         return {
-            'test_type': 'audio',
-            'total_tests': len(audio_results),
-            'results': audio_results,
-            'average_bleu': np.mean([r['bleu_score'] for r in audio_results]),
-            'perfect_rate': np.mean([r['perfect_translation'] for r in audio_results]),
-            'average_time': np.mean([r['execution_time'] for r in audio_results])
+            "test_type": "audio",
+            "total_tests": len(audio_results),
+            "results": audio_results,
+            "average_bleu": np.mean([r["bleu_score"] for r in audio_results]),
+            "perfect_rate": np.mean([r["perfect_translation"] for r in audio_results]),
+            "average_time": np.mean([r["execution_time"] for r in audio_results]),
         }
-    
+
     def run_multimodal_tests(self) -> Dict[str, Any]:
         """Run combined multimodal tests (text + image + audio)."""
         print("🔊 Running multimodal translation tests...")
-        
+
         # Create multimodal test cases
         test_cases = [
             {
-                'text': "안녕하세요",
-                'image_expected': "Hello",
-                'audio_expected': "Hello",
-                'combined_expected': "Hello",
-                'description': "Basic greeting across all modalities"
+                "text": "안녕하세요",
+                "image_expected": "Hello",
+                "audio_expected": "Hello",
+                "combined_expected": "Hello",
+                "description": "Basic greeting across all modalities",
             },
             {
-                'text': "감사합니다",
-                'image_expected': "Thank you",
-                'audio_expected': "Thank you", 
-                'combined_expected': "Thank you",
-                'description': "Gratitude expression across all modalities"
-            }
+                "text": "감사합니다",
+                "image_expected": "Thank you",
+                "audio_expected": "Thank you",
+                "combined_expected": "Thank you",
+                "description": "Gratitude expression across all modalities",
+            },
         ]
-        
+
         multimodal_results = []
-        
+
         for test_case in test_cases:
             start_time = time.time()
-            
+
             try:
                 # Generate image and audio
                 images = self.generate_test_images()
                 audio_samples = self.generate_test_audio()
-                
+
                 # Use first image and audio
-                image_tensor = torch.from_numpy(images[0][0]).permute(2, 0, 1).float() / 255.0
+                image_tensor = (
+                    torch.from_numpy(images[0][0]).permute(2, 0, 1).float() / 255.0
+                )
                 image_tensor = image_tensor.unsqueeze(0).to(self.device)
-                
-                audio_tensor = torch.from_numpy(audio_samples[0][0]).float().unsqueeze(0).unsqueeze(0)
+
+                audio_tensor = (
+                    torch.from_numpy(audio_samples[0][0])
+                    .float()
+                    .unsqueeze(0)
+                    .unsqueeze(0)
+                )
                 audio_tensor = audio_tensor.to(self.device)
-                
+
                 # Tokenize text
-                src_tokens = self._tokenize(test_case['text'])
-                
+                src_tokens = self._tokenize(test_case["text"])
+
                 # Generate translation using all modalities
                 with torch.no_grad():
                     generated = self.multimodal_model.generate(
                         src_tokens,
                         src_images=image_tensor,
                         src_audio=audio_tensor,
-                        max_len=len(test_case['combined_expected'].split()) + 10,
+                        max_len=len(test_case["combined_expected"].split()) + 10,
                         beam_size=4,
-                        temperature=0.8
+                        temperature=0.8,
                     )
-                
+
                 # Decode output
                 translation = self._detokenize(generated)
-                
+
                 # Calculate metrics
-                bleu_score = self.bleu_scorer([test_case['combined_expected']], [translation])
-                exact_match = self.exact_match_scorer(test_case['combined_expected'], translation)
-                semantic_sim = self.semantic_scorer(test_case['combined_expected'], translation)
-                
+                bleu_score = self.bleu_scorer(
+                    [test_case["combined_expected"]], [translation]
+                )
+                exact_match = self.exact_match_scorer(
+                    test_case["combined_expected"], translation
+                )
+                semantic_sim = self.semantic_scorer(
+                    test_case["combined_expected"], translation
+                )
+
                 execution_time = time.time() - start_time
-                
+
                 result = {
-                    'input_text': test_case['text'],
-                    'expected': test_case['combined_expected'],
-                    'predicted': translation,
-                    'description': test_case['description'],
-                    'bleu_score': bleu_score,
-                    'exact_match': exact_match,
-                    'semantic_similarity': semantic_sim,
-                    'execution_time': execution_time,
-                    'perfect_translation': bleu_score > 0.8 and exact_match == 1.0,
-                    'test_type': 'multimodal'
+                    "input_text": test_case["text"],
+                    "expected": test_case["combined_expected"],
+                    "predicted": translation,
+                    "description": test_case["description"],
+                    "bleu_score": bleu_score,
+                    "exact_match": exact_match,
+                    "semantic_similarity": semantic_sim,
+                    "execution_time": execution_time,
+                    "perfect_translation": bleu_score > 0.8 and exact_match == 1.0,
+                    "test_type": "multimodal",
                 }
-                
+
                 multimodal_results.append(result)
-                print(f"🔊 Multimodal test: {test_case['description']} → {translation} (BLEU: {bleu_score:.3f})")
-                
+                print(
+                    f"🔊 Multimodal test: {test_case['description']} → {translation} (BLEU: {bleu_score:.3f})"
+                )
+
             except Exception as e:
                 print(f"❌ Error in multimodal test '{test_case['description']}': {e}")
                 result = {
-                    'input_text': test_case['text'],
-                    'expected': test_case['combined_expected'],
-                    'predicted': "ERROR",
-                    'description': test_case['description'],
-                    'bleu_score': 0.0,
-                    'exact_match': 0,
-                    'semantic_similarity': 0.0,
-                    'execution_time': time.time() - start_time,
-                    'perfect_translation': False,
-                    'test_type': 'multimodal',
-                    'error': str(e)
+                    "input_text": test_case["text"],
+                    "expected": test_case["combined_expected"],
+                    "predicted": "ERROR",
+                    "description": test_case["description"],
+                    "bleu_score": 0.0,
+                    "exact_match": 0,
+                    "semantic_similarity": 0.0,
+                    "execution_time": time.time() - start_time,
+                    "perfect_translation": False,
+                    "test_type": "multimodal",
+                    "error": str(e),
                 }
                 multimodal_results.append(result)
-        
+
         return {
-            'test_type': 'multimodal',
-            'total_tests': len(multimodal_results),
-            'results': multimodal_results,
-            'average_bleu': np.mean([r['bleu_score'] for r in multimodal_results]),
-            'perfect_rate': np.mean([r['perfect_translation'] for r in multimodal_results]),
-            'average_time': np.mean([r['execution_time'] for r in multimodal_results])
+            "test_type": "multimodal",
+            "total_tests": len(multimodal_results),
+            "results": multimodal_results,
+            "average_bleu": np.mean([r["bleu_score"] for r in multimodal_results]),
+            "perfect_rate": np.mean(
+                [r["perfect_translation"] for r in multimodal_results]
+            ),
+            "average_time": np.mean([r["execution_time"] for r in multimodal_results]),
         }
-    
+
     def run_comprehensive_tests(self) -> Dict[str, Any]:
         """Run all test types and generate comprehensive report."""
         print("🚀 Starting comprehensive multimodal translation tests...")
         start_time = time.time()
-        
+
         # Run all test types
         text_results = self.run_text_tests()
         image_results = self.run_image_tests()
         audio_results = self.run_audio_tests()
         multimodal_results = self.run_multimodal_tests()
-        
+
         # Compile results
         all_results = {
-            'text': text_results,
-            'image': image_results,
-            'audio': audio_results,
-            'multimodal': multimodal_results
+            "text": text_results,
+            "image": image_results,
+            "audio": audio_results,
+            "multimodal": multimodal_results,
         }
-        
+
         # Calculate overall statistics
-        total_tests = sum(results['total_tests'] for results in all_results.values())
-        overall_bleu = np.mean([results['average_bleu'] for results in all_results.values()])
-        overall_perfect_rate = np.mean([results['perfect_rate'] for results in all_results.values()])
+        total_tests = sum(results["total_tests"] for results in all_results.values())
+        overall_bleu = np.mean(
+            [results["average_bleu"] for results in all_results.values()]
+        )
+        overall_perfect_rate = np.mean(
+            [results["perfect_rate"] for results in all_results.values()]
+        )
         total_time = time.time() - start_time
-        
+
         summary = {
-            'total_tests': total_tests,
-            'overall_average_bleu': overall_bleu,
-            'overall_perfect_translation_rate': overall_perfect_rate,
-            'total_execution_time': total_time,
-            'tests_per_second': total_tests / total_time,
-            'target_achieved': overall_perfect_rate >= 0.99,
-            'improvement_needed': max(0.0, 0.99 - overall_perfect_rate)
+            "total_tests": total_tests,
+            "overall_average_bleu": overall_bleu,
+            "overall_perfect_translation_rate": overall_perfect_rate,
+            "total_execution_time": total_time,
+            "tests_per_second": total_tests / total_time,
+            "target_achieved": overall_perfect_rate >= 0.99,
+            "improvement_needed": max(0.0, 0.99 - overall_perfect_rate),
         }
-        
+
         # Store results
         self.results = {
-            'test_results': all_results,
-            'summary': summary,
-            'timestamp': datetime.now().isoformat()
+            "test_results": all_results,
+            "summary": summary,
+            "timestamp": datetime.now().isoformat(),
         }
-        
+
         # Print summary
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("COMPREHENSIVE MULTIMODAL TRANSLATION TEST SUMMARY")
-        print("="*80)
+        print("=" * 80)
         print(f"Total Tests: {total_tests}")
         print(f"Overall Average BLEU Score: {overall_bleu:.4f}")
         print(f"Perfect Translation Rate: {overall_perfect_rate:.2%}")
-        print(f"Target (99%) Achieved: {'✅ YES' if overall_perfect_rate >= 0.99 else '❌ NO'}")
+        print(
+            f"Target (99%) Achieved: {'✅ YES' if overall_perfect_rate >= 0.99 else '❌ NO'}"
+        )
         print(f"Total Execution Time: {total_time:.2f} seconds")
         print(f"Tests per Second: {total_tests / total_time:.2f}")
         print(f"Improvement Needed: {max(0.0, 0.99 - overall_perfect_rate):.2%}")
-        print("="*80)
-        
+        print("=" * 80)
+
         return self.results
-    
+
     def generate_report(self, output_dir: str = "tests/comprehensive/reports"):
         """Generate detailed HTML report with visualizations."""
         os.makedirs(output_dir, exist_ok=True)
-        
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        report_path = os.path.join(output_dir, f"multimodal_test_report_{timestamp}.html")
-        
+        report_path = os.path.join(
+            output_dir, f"multimodal_test_report_{timestamp}.html"
+        )
+
         # Generate visualizations
         self._create_visualizations(output_dir)
-        
+
         # Create HTML report
         html_content = self._generate_html_report()
-        
-        with open(report_path, 'w', encoding='utf-8') as f:
+
+        with open(report_path, "w", encoding="utf-8") as f:
             f.write(html_content)
-        
+
         print(f"📊 Detailed report saved to: {report_path}")
-        
+
         # Save JSON results - convert numpy types to Python types
         json_path = os.path.join(output_dir, f"multimodal_results_{timestamp}.json")
-        
+
         def convert_numpy_types(obj):
             """Convert numpy types to Python types for JSON serialization."""
             if isinstance(obj, np.integer):
@@ -773,65 +820,78 @@ class MultimodalTestSuite:
             elif isinstance(obj, list):
                 return [convert_numpy_types(item) for item in obj]
             return obj
-        
+
         json_serializable_results = convert_numpy_types(self.results)
-        
-        with open(json_path, 'w', encoding='utf-8') as f:
+
+        with open(json_path, "w", encoding="utf-8") as f:
             json.dump(json_serializable_results, f, ensure_ascii=False, indent=2)
-        
+
         print(f"📋 Detailed results saved to: {json_path}")
-        
+
         return report_path, json_path
-    
+
     def _create_visualizations(self, output_dir: str):
         """Create visualization plots."""
         # Set style
-        plt.style.use('seaborn-v0_8')
+        plt.style.use("seaborn-v0_8")
         sns.set_palette("husl")
-        
+
         # Create figures
         fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-        fig.suptitle('Multimodal Translation Test Results', fontsize=16, fontweight='bold')
-        
+        fig.suptitle(
+            "Multimodal Translation Test Results", fontsize=16, fontweight="bold"
+        )
+
         # Test type comparison
-        test_types = list(self.results['test_results'].keys())
-        bleu_scores = [self.results['test_results'][tt]['average_bleu'] for tt in test_types]
-        perfect_rates = [self.results['test_results'][tt]['perfect_rate'] for tt in test_types]
-        
-        axes[0, 0].bar(test_types, bleu_scores, color='skyblue', alpha=0.7)
-        axes[0, 0].set_title('Average BLEU Scores by Test Type')
-        axes[0, 0].set_ylabel('BLEU Score')
+        test_types = list(self.results["test_results"].keys())
+        bleu_scores = [
+            self.results["test_results"][tt]["average_bleu"] for tt in test_types
+        ]
+        perfect_rates = [
+            self.results["test_results"][tt]["perfect_rate"] for tt in test_types
+        ]
+
+        axes[0, 0].bar(test_types, bleu_scores, color="skyblue", alpha=0.7)
+        axes[0, 0].set_title("Average BLEU Scores by Test Type")
+        axes[0, 0].set_ylabel("BLEU Score")
         axes[0, 0].set_ylim(0, 1)
-        
-        axes[0, 1].bar(test_types, perfect_rates, color='lightcoral', alpha=0.7)
-        axes[0, 1].set_title('Perfect Translation Rates by Test Type')
-        axes[0, 1].set_ylabel('Perfect Rate')
+
+        axes[0, 1].bar(test_types, perfect_rates, color="lightcoral", alpha=0.7)
+        axes[0, 1].set_title("Perfect Translation Rates by Test Type")
+        axes[0, 1].set_ylabel("Perfect Rate")
         axes[0, 1].set_ylim(0, 1)
-        
+
         # Execution time comparison
-        exec_times = [self.results['test_results'][tt]['average_time'] for tt in test_types]
-        axes[1, 0].bar(test_types, exec_times, color='lightgreen', alpha=0.7)
-        axes[1, 0].set_title('Average Execution Time by Test Type')
-        axes[1, 0].set_ylabel('Time (seconds)')
-        
+        exec_times = [
+            self.results["test_results"][tt]["average_time"] for tt in test_types
+        ]
+        axes[1, 0].bar(test_types, exec_times, color="lightgreen", alpha=0.7)
+        axes[1, 0].set_title("Average Execution Time by Test Type")
+        axes[1, 0].set_ylabel("Time (seconds)")
+
         # Test count comparison
-        test_counts = [self.results['test_results'][tt]['total_tests'] for tt in test_types]
-        axes[1, 1].pie(test_counts, labels=test_types, autopct='%1.1f%%', startangle=90)
-        axes[1, 1].set_title('Test Distribution by Type')
-        
+        test_counts = [
+            self.results["test_results"][tt]["total_tests"] for tt in test_types
+        ]
+        axes[1, 1].pie(test_counts, labels=test_types, autopct="%1.1f%%", startangle=90)
+        axes[1, 1].set_title("Test Distribution by Type")
+
         plt.tight_layout()
-        
+
         # Save plot
-        viz_path = os.path.join(output_dir, f"multimodal_visualizations_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
-        plt.savefig(viz_path, dpi=300, bbox_inches='tight')
+        viz_path = os.path.join(
+            output_dir,
+            f"multimodal_visualizations_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
+        )
+        plt.savefig(viz_path, dpi=300, bbox_inches="tight")
         plt.close()
-        
+
         print(f"📈 Visualizations saved to: {viz_path}")
-    
+
     def _generate_html_report(self) -> str:
         """Generate HTML report content."""
-        summary = self.results['summary']
-        
+        summary = self.results["summary"]
+
         html = f"""
         <!DOCTYPE html>
         <html lang="en">
@@ -903,9 +963,9 @@ class MultimodalTestSuite:
                     </div>
                 </div>
         """
-        
+
         # Add detailed results for each test type
-        for test_type, results in self.results['test_results'].items():
+        for test_type, results in self.results["test_results"].items():
             html += f"""
                 <div class="test-section">
                     <h3>{'📝' if test_type == 'text' else '🖼️' if test_type == 'image' else '🎵' if test_type == 'audio' else '🔊'} {test_type.title()} Translation Tests</h3>
@@ -914,27 +974,31 @@ class MultimodalTestSuite:
                        <strong>Perfect Rate:</strong> {results['perfect_rate']:.1%} | 
                        <strong>Avg Time:</strong> {results['average_time']:.3f}s</p>
             """
-            
+
             # Show first few results as examples
-            for i, result in enumerate(results['results'][:5]):
-                perfect_class = "perfect" if result.get('perfect_translation', False) else ""
-                error_class = "error" if 'error' in result else ""
-                
-                if test_type == 'text':
+            for i, result in enumerate(results["results"][:5]):
+                perfect_class = (
+                    "perfect" if result.get("perfect_translation", False) else ""
+                )
+                error_class = "error" if "error" in result else ""
+
+                if test_type == "text":
                     input_display = f"<span class='korean'>{result['input']}</span>"
-                elif test_type == 'image':
+                elif test_type == "image":
                     input_display = f"Image ({result['input_image_shape']}) - {result['description']}"
-                elif test_type == 'audio':
+                elif test_type == "audio":
                     input_display = f"Audio ({result['input_audio_shape']}) - {result['description']}"
                 else:
-                    input_display = f"Text: <span class='korean'>{result['input_text']}</span>"
-                
+                    input_display = (
+                        f"Text: <span class='korean'>{result['input_text']}</span>"
+                    )
+
                 bleu_class = (
-                    'bleu-high' if result['bleu_score'] > 0.7 else
-                    'bleu-medium' if result['bleu_score'] > 0.4 else
-                    'bleu-low'
+                    "bleu-high"
+                    if result["bleu_score"] > 0.7
+                    else "bleu-medium" if result["bleu_score"] > 0.4 else "bleu-low"
                 )
-                
+
                 html += f"""
                     <div class="test-result {perfect_class} {error_class}">
                         <strong>Input:</strong> {input_display}<br>
@@ -946,12 +1010,14 @@ class MultimodalTestSuite:
                         <strong>Time:</strong> {result['execution_time']:.3f}s
                     </div>
                 """
-            
-            if len(results['results']) > 5:
-                html += f"<p><em>... and {len(results['results']) - 5} more tests</em></p>"
-            
+
+            if len(results["results"]) > 5:
+                html += (
+                    f"<p><em>... and {len(results['results']) - 5} more tests</em></p>"
+                )
+
             html += "</div>"
-        
+
         html += """
                 <div style="margin-top: 40px; padding: 20px; background: #f8f9fa; border-radius: 10px;">
                     <h3>🔍 Analysis & Recommendations</h3>
@@ -976,31 +1042,31 @@ class MultimodalTestSuite:
         </body>
         </html>
         """
-        
+
         return html
 
 
 def main():
     """Main function to run comprehensive multimodal tests."""
     print("🚀 Starting Comprehensive Multimodal Translation Validation Suite")
-    
+
     # Initialize test suite
     test_suite = MultimodalTestSuite(
         model_path="models",
         tokenizer_path="models/tokenizer.pt",
-        device='cuda' if torch.cuda.is_available() else 'cpu'
+        device="cuda" if torch.cuda.is_available() else "cpu",
     )
-    
+
     # Run comprehensive tests
     results = test_suite.run_comprehensive_tests()
-    
+
     # Generate report
     report_path, json_path = test_suite.generate_report()
-    
+
     print(f"\n🎉 Testing completed!")
     print(f"📊 Report: {report_path}")
     print(f"📋 Results: {json_path}")
-    
+
     return results
 
 

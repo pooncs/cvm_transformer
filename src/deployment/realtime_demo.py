@@ -11,18 +11,22 @@ def dummy_tokenizer(text):
     class Dummy:
         def encode(self, text):
             return text.strip().split()
+
         def decode(self, ids):
             return ids
+
     return Dummy()
 
 
 def main():
     print("Real-time audio translation demo is currently unavailable.")
     print("The required modules (WhisperStreamer, cvm_translate_chunk, CVMTransformer)")
-    print("were removed during project reorganization and would need to be reimplemented.")
+    print(
+        "were removed during project reorganization and would need to be reimplemented."
+    )
     print("\nFor text-based translation, use the main pipeline instead:")
     print("python pipeline.py --stage train")
-    
+
     # Original functionality (requires reimplementation):
     # tokenizer = dummy_tokenizer("dummy")
     # model = CVMTransformer(vocab_size=1000, d_model=128, n_layers=2)
