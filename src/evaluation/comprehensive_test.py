@@ -8,7 +8,7 @@ import torch.nn as nn
 import sys
 sys.path.append('.')
 
-from cvm_translator.sp_tokenizer import SPTokenizer
+from src.models.sp_tokenizer import SPTokenizer
 import json
 
 class SimpleTransformer(nn.Module):
