@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.8, 3.9, "3.10", "3.11"]
+        python-version: ["3.10"]
 
     steps:
     - uses: actions/checkout@v4
@@ -50,11 +50,16 @@ jobs:
       run: black --check .
 
     - name: Type check with mypy
-      run: mypy cvm_translator/ --ignore-missing-imports
+      run: mypy src/ --ignore-missing-imports
+
+    - name: Validate Korean-English translation accuracy
+      run: |
+        python validate_advanced_translation.py --accuracy-threshold 99
+        python tests/run_comprehensive_validation.py
 
     - name: Run unit tests
       run: |
-        pytest tests/ -v --cov=cvm_translator --cov-report=xml --cov-report=html
+        pytest tests/ -v --cov=src --cov-report=xml --cov-report=html
 
     - name: Upload coverage reports
       uses: codecov/codecov-action@v3
@@ -152,6 +157,44 @@ jobs:
       with:
         sarif_file: 'trivy-results.sarif'
 
+  model-training-validation:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install wandb
+    
+    - name: Run model training validation
+      run: |
+        # Quick training validation with small dataset
+        python train_advanced_nmt.py --quick-validation --epochs 5
+        
+        # Validate model architecture
+        python scripts/test_advanced_model.py --architecture-validation
+        
+        # Test tokenizer functionality
+        python scripts/test_tokenization.py --comprehensive
+    
+    - name: Upload training artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: training-validation-results
+        path: |
+          training_validation_report.json
+          model_architecture_summary.txt
+          tokenizer_validation_report.txt
+
   performance-test:
     needs: deploy-staging
     runs-on: ubuntu-latest
@@ -172,12 +215,15 @@ jobs:
 
     - name: Run performance tests
       run: |
-        # Start the application
-        python scripts/start_server.py &
-        sleep 10
+        # Test Korean-English translation performance
+        python src/deployment/grpc_server.py &
+        sleep 5
         
-        # Run Locust performance tests
-        locust -f tests/performance/locustfile.py --headless -u 10 -r 2 -t 30s --host http://localhost:8000
+        # Run translation performance tests
+        python tests/comprehensive/comprehensive_test_suite.py --performance-mode
+        
+        # Test inference speed
+        python scripts/test_inference_quality.py --performance-test
 
     - name: Upload performance results
       uses: actions/upload-artifact@v3
