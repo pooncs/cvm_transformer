@@ -1,0 +1,65 @@
+
+========================================
+QUICK MULTIMODAL VALIDATION REPORT
+========================================
+Timestamp: 2025-11-16T00:13:58.612923
+Total Test Time: 0.04 seconds
+Device: cuda
+
+=== TEXT BASELINE PERFORMANCE ===
+Average BLEU Score: 1.0000
+Perfect Translation Rate: 100.0%
+Average Inference Time: 0.0000s
+
+=== MULTIMODAL PERFORMANCE ===
+Average BLEU Score: 0.7333
+Perfect Translation Rate: 73.3%
+Average Inference Time: 0.0003s
+
+Improvement over Text: -0.2667
+
+=== DOMAIN PERFORMANCE ===
+
+BUSINESS Domain:
+  - Average BLEU: 1.0000
+  - Perfect Translation Rate: 100.0%
+  - Total Tests: 3
+
+MEDICAL Domain:
+  - Average BLEU: 0.6667
+  - Perfect Translation Rate: 66.7%
+  - Total Tests: 3
+
+TECHNOLOGY Domain:
+  - Average BLEU: 0.6667
+  - Perfect Translation Rate: 66.7%
+  - Total Tests: 3
+
+EDUCATION Domain:
+  - Average BLEU: 0.6667
+  - Perfect Translation Rate: 66.7%
+  - Total Tests: 3
+
+TRAVEL Domain:
+  - Average BLEU: 0.6667
+  - Perfect Translation Rate: 66.7%
+  - Total Tests: 3
+
+=== ROBUSTNESS ANALYSIS ===
+Clean Inputs BLEU: 1.0000
+Noisy Image BLEU: 1.0000
+Noisy Audio BLEU: 1.0000
+
+Image Noise Degradation: +0.0000
+Audio Noise Degradation: +0.0000
+
+=== TARGET ANALYSIS ===
+Target 99% Perfect Translation: ❌ NOT ACHIEVED
+Current Perfect Translation Rate: 73.3%
+Gap to Target: 25.7%
+
+=== RECOMMENDATIONS ===
+1. Multimodal approach shows -0.2667 BLEU improvement over text-only
+2. Best performing domain: business (BLEU: 1.0000)
+3. Focus improvement on: medical domain (BLEU: 0.6667)
+4. Model shows good robustness to input noise

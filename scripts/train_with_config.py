@@ -13,8 +13,8 @@ from typing import List, Tuple
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from cvm_translator.cvm_transformer import CVMTransformer
-from cvm_translator.validation_protocol import ValidationConfig, DistillationValidator
+from src.models.cvm_transformer import CVMTransformer
+from src.evaluation.validation_protocol import ValidationConfig, DistillationValidator
 
 
 def load_config(path: str):

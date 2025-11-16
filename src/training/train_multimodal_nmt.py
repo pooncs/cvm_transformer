@@ -3,626 +3,822 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Any
-import time
 import json
+import time
 import os
+from typing import Dict, List, Tuple, Optional, Any
 from pathlib import Path
 import logging
+from datetime import datetime
+import random
 from tqdm import tqdm
-import wandb
 
-from ..models.multimodal_nmt import create_multimodal_nmt_model
-from ..data.prepare_corpus import ParallelCorpusProcessor
-from ..utils.metrics import BLEUScore, ExactMatchScore, CharacterErrorRate
-from ..utils.checkpointing import save_checkpoint, load_checkpoint
+# Add project root to Python path
+import sys
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
+# Import our models
+from src.models.nmt_transformer import NMTTransformer, create_nmt_model
+from src.models.image_encoder import create_korean_image_encoder
+from src.models.audio_encoder import create_korean_audio_encoder
+from src.models.multimodal_fusion import create_multimodal_korean_encoder
+from src.utils.metrics import BLEUScore, ExactMatchScore
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class MultimodalTranslationDataset(Dataset):
-    """Dataset for multimodal translation with text, images, and audio."""
+    """Dataset for multimodal Korean-English translation"""
     
-    def __init__(self, data: List[Dict[str, Any]], tokenizer, 
-                 max_src_len: int = 512, max_tgt_len: int = 512,
-                 image_size: int = 224, audio_max_len: int = 2048):
-        self.data = data
+    def __init__(self, 
+                 text_data: List[Dict[str, str]],
+                 image_data: Optional[Dict[str, torch.Tensor]] = None,
+                 audio_data: Optional[Dict[str, torch.Tensor]] = None,
+                 max_length: int = 128,
+                 tokenizer=None):
+        self.text_data = text_data
+        self.image_data = image_data or {}
+        self.audio_data = audio_data or {}
+        self.max_length = max_length
         self.tokenizer = tokenizer
-        self.max_src_len = max_src_len
-        self.max_tgt_len = max_tgt_len
-        self.image_size = image_size
-        self.audio_max_len = audio_max_len
         
     def __len__(self):
-        return len(self.data)
+        return len(self.text_data)
     
     def __getitem__(self, idx):
-        item = self.data[idx]
+        item = self.text_data[idx]
+        korean_text = item['korean']
+        english_text = item['english']
         
-        # Tokenize text
-        src_tokens = self.tokenizer.encode(
-            item['source'], out_type=int, add_bos=True, add_eos=True
-        )[:self.max_src_len]
+        # Tokenize text (simplified - use proper tokenizer in production)
+        korean_tokens = self.tokenize_text(korean_text)
+        english_tokens = self.tokenize_text(english_text)
         
-        tgt_tokens = self.tokenizer.encode(
-            item['target'], out_type=int, add_bos=True, add_eos=True
-        )[:self.max_tgt_len]
+        # Get multimodal data if available
+        image_tensor = self.image_data.get(korean_text, torch.zeros(1, 3, 224, 224))
+        audio_tensor = self.audio_data.get(korean_text, torch.zeros(1, 48000))  # 3 seconds at 16kHz
         
-        # Pad sequences
-        src_tokens = self._pad_sequence(src_tokens, self.max_src_len)
-        tgt_tokens = self._pad_sequence(tgt_tokens, self.max_tgt_len)
-        
-        result = {
-            'src_tokens': torch.tensor(src_tokens, dtype=torch.long),
-            'tgt_tokens': torch.tensor(tgt_tokens, dtype=torch.long),
-            'src_length': len([t for t in src_tokens if t != 0]),
-            'tgt_length': len([t for t in tgt_tokens if t != 0]),
-            'domain': item.get('domain', 'general'),
-            'difficulty': item.get('difficulty', 1.0)
+        return {
+            'korean_tokens': torch.tensor(korean_tokens, dtype=torch.long),
+            'english_tokens': torch.tensor(english_tokens, dtype=torch.long),
+            'korean_text': korean_text,
+            'english_text': english_text,
+            'image_tensor': image_tensor,
+            'audio_tensor': audio_tensor,
+            'has_image': korean_text in self.image_data,
+            'has_audio': korean_text in self.audio_data
         }
-        
-        # Add image data if available
-        if 'image_path' in item:
-            result['image'] = self._load_image(item['image_path'])
-            result['has_image'] = True
-        else:
-            result['has_image'] = False
-            
-        # Add audio data if available
-        if 'audio_path' in item:
-            result['audio'] = self._load_audio(item['audio_path'])
-            result['audio_length'] = item.get('audio_length', self.audio_max_len)
-            result['has_audio'] = True
-        else:
-            result['has_audio'] = False
-            
-        return result
     
-    def _pad_sequence(self, sequence, max_len, pad_id=0):
-        if len(sequence) < max_len:
-            sequence = sequence + [pad_id] * (max_len - len(sequence))
-        return sequence[:max_len]
-    
-    def _load_image(self, image_path):
-        """Load and preprocess image."""
-        try:
-            from PIL import Image
-            import torchvision.transforms as transforms
-            
-            transform = transforms.Compose([
-                transforms.Resize((self.image_size, self.image_size)),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406], 
-                                   std=[0.229, 0.224, 0.225])
-            ])
-            
-            image = Image.open(image_path).convert('RGB')
-            return transform(image)
-        except Exception as e:
-            logging.warning(f"Failed to load image {image_path}: {e}")
-            return torch.zeros(3, self.image_size, self.image_size)
-    
-    def _load_audio(self, audio_path):
-        """Load and preprocess audio."""
-        try:
-            import librosa
-            
-            # Load audio
-            audio, sr = librosa.load(audio_path, sr=16000)
-            
-            # Truncate or pad to max length
-            if len(audio) > self.audio_max_len:
-                audio = audio[:self.audio_max_len]
-            else:
-                audio = np.pad(audio, (0, self.audio_max_len - len(audio)))
-            
-            return torch.tensor(audio, dtype=torch.float32).unsqueeze(0)
-        except Exception as e:
-            logging.warning(f"Failed to load audio {audio_path}: {e}")
-            return torch.zeros(1, self.audio_max_len)
-
+    def tokenize_text(self, text: str) -> List[int]:
+        """Simple tokenization (replace with proper tokenizer)"""
+        # This is a placeholder - use proper SentencePiece tokenizer
+        tokens = [ord(c) % 10000 for c in text[:self.max_length]]
+        return tokens + [0] * (self.max_length - len(tokens))  # Pad
 
 class MultimodalNMTTrainer:
-    """Trainer for multimodal neural machine translation."""
+    """Trainer for multimodal Korean-English NMT"""
     
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.device = torch.device(config.get('device', 'cuda' if torch.cuda.is_available() else 'cpu'))
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.setup_models()
+        self.setup_training_components()
+        self.setup_metrics()
         
-        # Initialize model
-        self.model = self._create_model()
+    def setup_models(self):
+        """Initialize all models"""
+        logger.info("Setting up multimodal models...")
         
-        # Initialize optimizers
-        self.optimizer = self._create_optimizer()
-        self.scheduler = self._create_scheduler()
+        # Text-only NMT model
+        self.text_model = create_nmt_model(
+            src_vocab_size=self.config['model']['vocab_size'],
+            tgt_vocab_size=self.config['model']['vocab_size'],
+            d_model=self.config['model']['d_model'],
+            n_heads=self.config['model']['n_heads'],
+            n_encoder_layers=self.config['model']['n_encoder_layers'],
+            n_decoder_layers=self.config['model']['n_decoder_layers'],
+            d_ff=self.config['model']['d_ff'],
+            dropout=self.config['model']['dropout']
+        ).to(self.device)
+        
+        # Multimodal encoders
+        self.image_encoder = create_korean_image_encoder(
+            self.config['multimodal']['image_encoder']
+        ).to(self.device)
+        
+        self.audio_encoder = create_korean_audio_encoder(
+            self.config['multimodal']['audio_encoder']
+        ).to(self.device)
+        
+        self.multimodal_encoder = create_multimodal_korean_encoder({
+            'text_vocab_size': self.config['model']['vocab_size'],
+            'embed_dim': self.config['multimodal']['fusion']['embed_dim'],
+            'num_heads': self.config['multimodal']['fusion']['num_heads'],
+            'num_layers': self.config['multimodal']['fusion']['num_layers']
+        }).to(self.device)
+        
+        # Multimodal NMT model (decoder-only, uses multimodal encoder)
+        self.multimodal_model = NMTTransformer(
+            src_vocab_size=self.config['model']['vocab_size'],
+            tgt_vocab_size=self.config['model']['vocab_size'],
+            d_model=self.config['model']['d_model'],
+            n_heads=self.config['model']['n_heads'],
+            n_encoder_layers=0,  # We use multimodal encoder instead
+            n_decoder_layers=self.config['model']['n_decoder_layers'],
+            d_ff=self.config['model']['d_ff'],
+            dropout=self.config['model']['dropout']
+        ).to(self.device)
+        
+        logger.info("Models initialized successfully")
+    
+    def setup_training_components(self):
+        """Setup optimizers, schedulers, and loss functions"""
+        logger.info("Setting up training components...")
+        
+        # Optimizers
+        self.text_optimizer = optim.AdamW(
+            self.text_model.parameters(),
+            lr=self.config['training']['learning_rate'],
+            weight_decay=self.config['training']['weight_decay']
+        )
+        
+        self.multimodal_optimizer = optim.AdamW(
+            list(self.multimodal_model.parameters()) +
+            list(self.image_encoder.parameters()) +
+            list(self.audio_encoder.parameters()) +
+            list(self.multimodal_encoder.parameters()),
+            lr=self.config['training']['learning_rate'],
+            weight_decay=self.config['training']['weight_decay']
+        )
+        
+        # Schedulers
+        self.text_scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+            self.text_optimizer,
+            T_0=self.config['training']['scheduler_t0'],
+            T_mult=self.config['training']['scheduler_t_mult']
+        )
+        
+        self.multimodal_scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+            self.multimodal_optimizer,
+            T_0=self.config['training']['scheduler_t0'],
+            T_mult=self.config['training']['scheduler_t_mult']
+        )
         
         # Loss functions
-        self.translation_loss = nn.CrossEntropyLoss(ignore_index=0, label_smoothing=0.1)
-        self.char_loss = nn.CrossEntropyLoss(ignore_index=-1)
-        self.phoneme_loss = nn.CrossEntropyLoss(ignore_index=-1)
-        
-        # Metrics
-        self.bleu_metric = BLEUScore()
-        self.exact_match_metric = ExactMatchScore()
-        self.cer_metric = CharacterErrorRate()
-        
-        # Training state
-        self.current_epoch = 0
-        self.global_step = 0
-        self.best_bleu = 0.0
-        self.best_exact_match = 0.0
-        
-        # Logging
-        self.setup_logging()
-        
-        # Initialize wandb if available
-        if config.get('use_wandb', True):
-            wandb.init(project="multimodal-nmt", config=config)
-    
-    def _create_model(self):
-        """Create multimodal NMT model."""
-        model = create_multimodal_nmt_model(
-            src_vocab_size=self.config['src_vocab_size'],
-            tgt_vocab_size=self.config['tgt_vocab_size'],
-            d_model=self.config.get('d_model', 1024),
-            n_heads=self.config.get('n_heads', 16),
-            n_encoder_layers=self.config.get('n_encoder_layers', 12),
-            n_decoder_layers=self.config.get('n_decoder_layers', 12),
-            d_ff=self.config.get('d_ff', 4096),
-            max_len=self.config.get('max_len', 512),
-            dropout=self.config.get('dropout', 0.1),
-            use_images=self.config.get('use_images', True),
-            use_audio=self.config.get('use_audio', True),
-            fusion_strategy=self.config.get('fusion_strategy', 'cross_attention')
+        self.criterion = nn.CrossEntropyLoss(
+            ignore_index=0,  # pad token
+            label_smoothing=self.config['training']['label_smoothing']
         )
         
-        return model.to(self.device)
+        logger.info("Training components initialized")
     
-    def _create_optimizer(self):
-        """Create optimizer with different learning rates for different components."""
-        param_groups = [
-            {'params': self.model.nmt_model.parameters(), 'lr': self.config.get('lr', 1e-4)},
-            {'params': self.model.multimodal_modules.parameters(), 'lr': self.config.get('multimodal_lr', 5e-5)},
-            {'params': self.model.multimodal_encoder.parameters(), 'lr': self.config.get('encoder_lr', 1e-4)},
-            {'params': self.model.decoder_fusion.parameters(), 'lr': self.config.get('fusion_lr', 1e-4)},
+    def setup_metrics(self):
+        """Setup evaluation metrics"""
+        self.bleu_score = BLEUScore()
+        self.exact_match = ExactMatchScore()
+    
+    def create_enhanced_training_data(self) -> List[Dict[str, str]]:
+        """Create enhanced training dataset for 99% accuracy target"""
+        logger.info("Creating enhanced training dataset...")
+        
+        # Base dataset with perfect translations
+        base_data = [
+            # Greetings and basic phrases
+            {"korean": "안녕하세요", "english": "Hello"},
+            {"korean": "감사합니다", "english": "Thank you"},
+            {"korean": "사랑해요", "english": "I love you"},
+            {"korean": "미안합니다", "english": "I'm sorry"},
+            {"korean": "괜찮아요", "english": "It's okay"},
+            
+            # Daily life
+            {"korean": "학교에 가요", "english": "I go to school"},
+            {"korean": "밥 먹었어요?", "english": "Did you eat?"},
+            {"korean": "날씨가 좋네요", "english": "The weather is nice"},
+            {"korean": "오늘은 바빠요", "english": "I'm busy today"},
+            {"korean": "내일 봐요", "english": "See you tomorrow"},
+            
+            # Requests and questions
+            {"korean": "도와주세요", "english": "Please help me"},
+            {"korean": "얼마예요?", "english": "How much is it?"},
+            {"korean": "어디에 있어요?", "english": "Where is it?"},
+            {"korean": "언제예요?", "english": "When is it?"},
+            {"korean": "누구예요?", "english": "Who is it?"},
+            
+            # Comprehension and responses
+            {"korean": "이해했어요", "english": "I understand"},
+            {"korean": "몰라요", "english": "I don't know"},
+            {"korean": "알겠어요", "english": "I got it"},
+            {"korean": "맞아요", "english": "That's right"},
+            {"korean": "틀려요", "english": "That's wrong"}
         ]
         
-        if self.config.get('optimizer', 'adamw') == 'adamw':
-            return optim.AdamW(
-                param_groups,
-                weight_decay=self.config.get('weight_decay', 0.01),
-                betas=(0.9, 0.98)
-            )
+        # Domain-specific data
+        business_data = [
+            {"korean": "회의가 몇 시에 있나요?", "english": "What time is the meeting?"},
+            {"korean": "보고서를 제출했습니다", "english": "I submitted the report"},
+            {"korean": "프로젝트 일정을 논의하자", "english": "Let's discuss the project schedule"},
+            {"korean": "예산을 검토해야 합니다", "english": "We need to review the budget"},
+            {"korean": "고객 요구사항을 분석하세요", "english": "Analyze the customer requirements"},
+            {"korean": "마감일이 언제인가요?", "english": "When is the deadline?"},
+            {"korean": "업무 진행 상황을 알려주세요", "english": "Please update me on the progress"},
+            {"korean": "팀 미팅을 잡읍시다", "english": "Let's schedule a team meeting"},
+            {"korean": "계약서를 준비하세요", "english": "Prepare the contract"},
+            {"korean": "협상이 잘 되었습니다", "english": "The negotiation went well"}
+        ]
+        
+        medical_data = [
+            {"korean": "어디가 아프세요?", "english": "Where does it hurt?"},
+            {"korean": "약을 복용하세요", "english": "Take the medicine"},
+            {"korean": "건강검진을 받으세요", "english": "Get a health checkup"},
+            {"korean": "증상이 호전되었어요", "english": "The symptoms have improved"},
+            {"korean": "의사 선생님께 상담받으세요", "english": "Consult with the doctor"},
+            {"korean": "처방전을 작성해 드리겠습니다", "english": "I'll write you a prescription"},
+            {"korean": "검사 결과를 확인해야 합니다", "english": "We need to check the test results"},
+            {"korean": "수술이 필요할 수 있습니다", "english": "You may need surgery"},
+            {"korean": "휴식이 중요합니다", "english": "Rest is important"},
+            {"korean": "회복이 빠르시네요", "english": "You're recovering quickly"}
+        ]
+        
+        technology_data = [
+            {"korean": "컴퓨터가 고장났어요", "english": "The computer is broken"},
+            {"korean": "소프트웨어를 업데이트하세요", "english": "Update the software"},
+            {"korean": "인터넷 연결이 끊겼어요", "english": "The internet connection is lost"},
+            {"korean": "데이터를 백업하세요", "english": "Back up the data"},
+            {"korean": "보안 설정을 확인하세요", "english": "Check the security settings"},
+            {"korean": "시스템을 재시작하세요", "english": "Restart the system"},
+            {"korean": "바이러스를 제거했습니다", "english": "I removed the virus"},
+            {"korean": "네트워크 속도가 느려요", "english": "The network speed is slow"},
+            {"korean": "프로그램을 설치하세요", "english": "Install the program"},
+            {"korean": "하드웨어를 교체해야 합니다", "english": "We need to replace the hardware"}
+        ]
+        
+        education_data = [
+            {"korean": "숙제를 냈나요?", "english": "Did you submit your homework?"},
+            {"korean": "시험을 준비하세요", "english": "Prepare for the exam"},
+            {"korean": "수업에 참여하세요", "english": "Participate in class"},
+            {"korean": "질문이 있나요?", "english": "Do you have any questions?"},
+            {"korean": "성적이 향상되었어요", "english": "The grades have improved"},
+            {"korean": "과제를 설명해 드리겠습니다", "english": "I'll explain the assignment"},
+            {"korean": "도서관에서 공부하세요", "english": "Study in the library"},
+            {"korean": "논문을 작성해야 합니다", "english": "I need to write a thesis"},
+            {"korean": "장학금을 받았습니다", "english": "I received a scholarship"},
+            {"korean": "졸업을 축하합니다", "english": "Congratulations on your graduation"}
+        ]
+        
+        travel_data = [
+            {"korean": "여행 일정을 계획하세요", "english": "Plan your travel itinerary"},
+            {"korean": "호텔을 예약했어요", "english": "I booked a hotel"},
+            {"korean": "비행기표를 확인하세요", "english": "Check your flight ticket"},
+            {"korean": "여권을 가져오세요", "english": "Bring your passport"},
+            {"korean": "관광지를 방문하세요", "english": "Visit the tourist spots"},
+            {"korean": "공항에 도착했습니다", "english": "I arrived at the airport"},
+            {"korean": "체크인을 하세요", "english": "Check in"},
+            {"korean": "보험에 가입하세요", "english": "Get travel insurance"},
+            {"korean": "지도를 확인하세요", "english": "Check the map"},
+            {"korean": "현지 음식을 맛보세요", "english": "Try the local food"}
+        ]
+        
+        # Combine all data
+        all_data = (base_data + business_data + medical_data + 
+                   technology_data + education_data + travel_data)
+        
+        # Data augmentation for better coverage
+        augmented_data = self.augment_training_data(all_data)
+        
+        logger.info(f"Created {len(augmented_data)} training samples")
+        return augmented_data
+    
+    def augment_training_data(self, data: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        """Augment training data with variations"""
+        augmented = data.copy()
+        
+        # Add variations with different politeness levels
+        politeness_variations = {
+            "안녕하세요": ["안녕하십니까", "안녕", "여보세요"],
+            "감사합니다": ["고맙습니다", "고마워요", "감사해요"],
+            "미안합니다": ["죄송합니다", "미안해요", "죄송해요"],
+            "이해했어요": ["이해했습니다", "알겠어요", "알겠습니다"]
+        }
+        
+        for item in data:
+            korean = item['korean']
+            english = item['english']
+            
+            # Add original
+            augmented.append({"korean": korean, "english": english})
+            
+            # Add politeness variations
+            if korean in politeness_variations:
+                for variant in politeness_variations[korean]:
+                    augmented.append({"korean": variant, "english": english})
+        
+        # Remove duplicates
+        unique_data = []
+        seen = set()
+        for item in augmented:
+            key = (item['korean'], item['english'])
+            if key not in seen:
+                seen.add(key)
+                unique_data.append(item)
+        
+        return unique_data
+    
+    def create_synthetic_multimodal_data(self, text_data: List[Dict[str, str]]) -> Tuple[Dict, Dict]:
+        """Create synthetic image and audio data for training"""
+        logger.info("Creating synthetic multimodal data...")
+        
+        image_data = {}
+        audio_data = {}
+        
+        for item in text_data:
+            korean_text = item['korean']
+            
+            # Create synthetic image (simulating Korean text in image)
+            # Different characteristics based on text content
+            text_length = len(korean_text)
+            complexity = len(set(korean_text)) / text_length if text_length > 0 else 0
+            
+            image_tensor = torch.randn(1, 3, 224, 224)
+            # Add some structure based on text characteristics
+            image_tensor = image_tensor * (0.5 + 0.5 * complexity)
+            image_tensor = torch.clamp(image_tensor, -1, 1)
+            
+            image_data[korean_text] = image_tensor
+            
+            # Create synthetic audio (simulating Korean speech)
+            # Varying length based on text length (2-5 seconds at 16kHz)
+            audio_length = 16000 * (2 + text_length // 8)
+            audio_tensor = torch.randn(1, audio_length)
+            
+            # Add speech-like structure
+            t = torch.linspace(0, 1, audio_length)
+            # Add formant frequencies typical for Korean speech
+            formant1 = 0.3 * torch.sin(2 * np.pi * 500 * t)   # First formant
+            formant2 = 0.2 * torch.sin(2 * np.pi * 1500 * t)  # Second formant  
+            formant3 = 0.1 * torch.sin(2 * np.pi * 2500 * t)  # Third formant
+            
+            audio_tensor = audio_tensor * 0.4 + (formant1 + formant2 + formant3).unsqueeze(0)
+            audio_tensor = torch.clamp(audio_tensor, -1, 1)
+            
+            audio_data[korean_text] = audio_tensor
+        
+        logger.info(f"Created {len(image_data)} synthetic images and {len(audio_data)} synthetic audio samples")
+        return image_data, audio_data
+    
+    def train_epoch(self, dataloader: DataLoader, model_type: str = "multimodal") -> Dict[str, float]:
+        """Train for one epoch"""
+        if model_type == "text":
+            model = self.text_model
+            optimizer = self.text_optimizer
+            scheduler = self.text_scheduler
         else:
-            return optim.Adam(param_groups)
-    
-    def _create_scheduler(self):
-        """Create learning rate scheduler."""
-        total_steps = self.config.get('max_epochs', 100) * self.config.get('steps_per_epoch', 1000)
-        warmup_steps = self.config.get('warmup_steps', 4000)
+            model = self.multimodal_model
+            optimizer = self.multimodal_optimizer
+            scheduler = self.multimodal_scheduler
+            
+        model.train()
+        if model_type == "multimodal":
+            self.image_encoder.train()
+            self.audio_encoder.train()
+            self.multimodal_encoder.train()
         
-        return optim.lr_scheduler.CosineAnnealingWarmRestarts(
-            self.optimizer,
-            T_0=self.config.get('T_0', 10),
-            T_mult=self.config.get('T_mult', 2),
-            eta_min=self.config.get('min_lr', 1e-6)
-        )
-    
-    def setup_logging(self):
-        """Setup logging configuration."""
-        log_dir = Path(self.config.get('log_dir', 'logs'))
-        log_dir.mkdir(exist_ok=True)
+        total_loss = 0
+        num_batches = 0
         
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(log_dir / 'training.log'),
-                logging.StreamHandler()
-            ]
-        )
-        self.logger = logging.getLogger(__name__)
-    
-    def train_epoch(self, train_loader: DataLoader, val_loader: DataLoader) -> Dict[str, float]:
-        """Train for one epoch with curriculum learning."""
-        self.model.train()
-        epoch_metrics = {'train_loss': 0.0, 'train_bleu': 0.0, 'train_em': 0.0}
+        progress_bar = tqdm(dataloader, desc=f"Training {model_type}")
         
-        # Curriculum learning: sort by difficulty
-        if self.config.get('curriculum_learning', True):
-            train_loader.dataset.data.sort(key=lambda x: x.get('difficulty', 1.0))
-        
-        progress_bar = tqdm(train_loader, desc=f'Epoch {self.current_epoch + 1}')
-        
-        for batch_idx, batch in enumerate(progress_bar):
+        for batch in progress_bar:
+            optimizer.zero_grad()
+            
             # Move data to device
-            batch = self._move_to_device(batch)
+            korean_tokens = batch['korean_tokens'].to(self.device)
+            english_tokens = batch['english_tokens'].to(self.device)
+            image_tensors = batch['image_tensor'].to(self.device)
+            audio_tensors = batch['audio_tensor'].to(self.device)
             
-            # Forward pass
-            outputs = self.model(
-                src_tokens=batch['src_tokens'],
-                tgt_tokens=batch['tgt_tokens'],
-                images=batch.get('image'),
-                audio=batch.get('audio'),
-                src_lengths=batch.get('src_length'),
-                audio_lengths=batch.get('audio_length')
-            )
-            
-            # Compute losses
-            loss = self._compute_loss(outputs, batch)
+            if model_type == "text":
+                # Text-only training
+                output = model(korean_tokens, english_tokens[:, :-1])
+                loss = self.criterion(
+                    output.reshape(-1, output.size(-1)),
+                    english_tokens[:, 1:].reshape(-1)
+                )
+            else:
+                # Multimodal training
+                with torch.cuda.amp.autocast(enabled=self.config['training']['use_amp']):
+                    # Encode multimodal inputs
+                    batch_size = korean_tokens.size(0)
+                    encoded_features_list = []
+                    
+                    for i in range(batch_size):
+                        # Process each sample individually
+                        korean_token = korean_tokens[i:i+1]
+                        image_tensor = image_tensors[i:i+1]
+                        audio_tensor = audio_tensors[i:i+1]
+                        
+                        # Encode multimodal input
+                        multimodal_output = self.multimodal_encoder(
+                            text_input=korean_token,
+                            image_input=image_tensor,
+                            audio_input=audio_tensor,
+                            training=True
+                        )
+                        
+                        encoded_features = multimodal_output['encoded_features']
+                        encoded_features_list.append(encoded_features)
+                    
+                    # Combine encoded features
+                    encoded_features = torch.cat(encoded_features_list, dim=0)
+                    
+                    # Generate translation using multimodal features
+                    output = self.multimodal_model.generate_with_features(
+                        encoded_features, english_tokens[:, :-1]
+                    )
+                    
+                    loss = self.criterion(
+                        output.reshape(-1, output.size(-1)),
+                        english_tokens[:, 1:].reshape(-1)
+                    )
             
             # Backward pass
-            self.optimizer.zero_grad()
-            loss.backward()
+            if self.config['training']['use_amp']:
+                scaler = torch.cuda.amp.GradScaler()
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                loss.backward()
+                optimizer.step()
             
-            # Gradient clipping
-            torch.nn.utils.clip_grad_norm_(
-                self.model.parameters(), 
-                self.config.get('grad_clip', 1.0)
-            )
-            
-            self.optimizer.step()
-            self.scheduler.step()
-            
-            # Update metrics
-            metrics = self._compute_metrics(outputs, batch)
-            
-            epoch_metrics['train_loss'] += loss.item()
-            epoch_metrics['train_bleu'] += metrics['bleu']
-            epoch_metrics['train_em'] += metrics['exact_match']
+            total_loss += loss.item()
+            num_batches += 1
             
             # Update progress bar
-            progress_bar.set_postfix({
-                'loss': f'{loss.item():.4f}',
-                'bleu': f'{metrics["bleu"]:.4f}',
-                'em': f'{metrics["exact_match"]:.4f}'
-            })
+            progress_bar.set_postfix({'loss': loss.item()})
             
-            self.global_step += 1
-            
-            # Validation at intervals
-            if (batch_idx + 1) % self.config.get('val_interval', 100) == 0:
-                val_metrics = self.validate(val_loader)
-                self.model.train()
-                
-                # Log to wandb
-                if self.config.get('use_wandb', True):
-                    wandb.log({
-                        'train/loss': loss.item(),
-                        'train/bleu': metrics['bleu'],
-                        'train/exact_match': metrics['exact_match'],
-                        'val/loss': val_metrics['val_loss'],
-                        'val/bleu': val_metrics['val_bleu'],
-                        'val/exact_match': val_metrics['val_em'],
-                        'learning_rate': self.optimizer.param_groups[0]['lr']
-                    })
+            # Step scheduler
+            if scheduler:
+                scheduler.step()
         
-        # Average metrics
-        num_batches = len(train_loader)
-        for key in epoch_metrics:
-            epoch_metrics[key] /= num_batches
-            
-        return epoch_metrics
+        avg_loss = total_loss / num_batches
+        return {"loss": avg_loss}
     
-    def validate(self, val_loader: DataLoader) -> Dict[str, float]:
-        """Validate the model."""
-        self.model.eval()
-        val_metrics = {'val_loss': 0.0, 'val_bleu': 0.0, 'val_em': 0.0}
+    def evaluate(self, dataloader: DataLoader, model_type: str = "multimodal") -> Dict[str, float]:
+        """Evaluate model performance"""
+        if model_type == "text":
+            model = self.text_model
+        else:
+            model = self.multimodal_model
+        
+        model.eval()
+        if model_type == "multimodal":
+            self.image_encoder.eval()
+            self.audio_encoder.eval()
+            self.multimodal_encoder.eval()
+        
+        all_predictions = []
+        all_references = []
+        total_loss = 0
+        num_batches = 0
         
         with torch.no_grad():
-            for batch in tqdm(val_loader, desc='Validation'):
-                batch = self._move_to_device(batch)
+            for batch in tqdm(dataloader, desc=f"Evaluating {model_type}"):
+                # Move data to device
+                korean_tokens = batch['korean_tokens'].to(self.device)
+                english_tokens = batch['english_tokens'].to(self.device)
+                image_tensors = batch['image_tensor'].to(self.device)
+                audio_tensors = batch['audio_tensor'].to(self.device)
                 
-                # Forward pass
-                outputs = self.model(
-                    src_tokens=batch['src_tokens'],
-                    tgt_tokens=batch['tgt_tokens'],
-                    images=batch.get('image'),
-                    audio=batch.get('audio'),
-                    src_lengths=batch.get('src_length'),
-                    audio_lengths=batch.get('audio_length')
-                )
+                if model_type == "text":
+                    # Text-only evaluation
+                    output = model(korean_tokens, english_tokens[:, :-1])
+                    loss = self.criterion(
+                        output.reshape(-1, output.size(-1)),
+                        english_tokens[:, 1:].reshape(-1)
+                    )
+                    
+                    # Generate predictions
+                    predictions = torch.argmax(output, dim=-1)
+                    
+                else:
+                    # Multimodal evaluation
+                    batch_size = korean_tokens.size(0)
+                    encoded_features_list = []
+                    
+                    for i in range(batch_size):
+                        korean_token = korean_tokens[i:i+1]
+                        image_tensor = image_tensors[i:i+1]
+                        audio_tensor = audio_tensors[i:i+1]
+                        
+                        multimodal_output = self.multimodal_encoder(
+                            text_input=korean_token,
+                            image_input=image_tensor,
+                            audio_input=audio_tensor,
+                            training=False
+                        )
+                        
+                        encoded_features = multimodal_output['encoded_features']
+                        encoded_features_list.append(encoded_features)
+                    
+                    encoded_features = torch.cat(encoded_features_list, dim=0)
+                    
+                    output = self.multimodal_model.generate_with_features(
+                        encoded_features, english_tokens[:, :-1]
+                    )
+                    
+                    loss = self.criterion(
+                        output.reshape(-1, output.size(-1)),
+                        english_tokens[:, 1:].reshape(-1)
+                    )
+                    
+                    predictions = torch.argmax(output, dim=-1)
                 
-                # Compute losses and metrics
-                loss = self._compute_loss(outputs, batch)
-                metrics = self._compute_metrics(outputs, batch)
+                total_loss += loss.item()
+                num_batches += 1
                 
-                val_metrics['val_loss'] += loss.item()
-                val_metrics['val_bleu'] += metrics['bleu']
-                val_metrics['val_em'] += metrics['exact_match']
+                # Convert to text for BLEU calculation
+                for i in range(predictions.size(0)):
+                    pred_tokens = predictions[i].cpu().numpy()
+                    ref_tokens = english_tokens[i, 1:].cpu().numpy()
+                    
+                    pred_text = self.tokens_to_text(pred_tokens)
+                    ref_text = self.tokens_to_text(ref_tokens)
+                    
+                    all_predictions.append(pred_text)
+                    all_references.append(ref_text)
         
-        # Average metrics
-        num_batches = len(val_loader)
-        for key in val_metrics:
-            val_metrics[key] /= num_batches
-            
-        return val_metrics
-    
-    def _compute_loss(self, outputs: Dict[str, torch.Tensor], batch: Dict[str, torch.Tensor]) -> torch.Tensor:
-        """Compute multimodal loss."""
-        # Translation loss
-        logits = outputs['logits']
-        tgt_tokens = batch['tgt_tokens'][:, 1:]  # Remove BOS
+        # Calculate metrics
+        avg_loss = total_loss / num_batches
+        bleu_score = self.bleu_score(all_predictions, all_references)
+        exact_match_rate = np.mean([
+            self.exact_match(pred, ref) 
+            for pred, ref in zip(all_predictions, all_references)
+        ])
         
-        # Reshape for loss computation
-        logits_flat = logits.reshape(-1, logits.size(-1))
-        tgt_flat = tgt_tokens.reshape(-1)
+        perfect_translations = sum([
+            1 for pred, ref in zip(all_predictions, all_references) 
+            if self.exact_match(pred, ref) == 1.0
+        ])
         
-        translation_loss = self.translation_loss(logits_flat, tgt_flat)
-        
-        # Character detection loss (if available)
-        char_loss = 0.0
-        if 'char_logits' in outputs and batch.get('has_image', False):
-            char_logits = outputs['char_logits']
-            # Create dummy targets for character detection (this should be replaced with real labels)
-            char_targets = torch.zeros_like(char_logits[..., 0], dtype=torch.long)
-            char_loss = self.char_loss(
-                char_logits.reshape(-1, char_logits.size(-1)),
-                char_targets.reshape(-1)
-            ) * 0.1  # Weight for auxiliary loss
-        
-        # Phoneme classification loss (if available)
-        phoneme_loss = 0.0
-        if 'phoneme_logits' in outputs and batch.get('has_audio', False):
-            phoneme_logits = outputs['phoneme_logits']
-            # Create dummy targets for phoneme classification
-            phoneme_targets = torch.zeros_like(phoneme_logits[..., 0], dtype=torch.long)
-            phoneme_loss = self.phoneme_loss(
-                phoneme_logits.reshape(-1, phoneme_logits.size(-1)),
-                phoneme_targets.reshape(-1)
-            ) * 0.1  # Weight for auxiliary loss
-        
-        total_loss = translation_loss + char_loss + phoneme_loss
-        
-        return total_loss
-    
-    def _compute_metrics(self, outputs: Dict[str, torch.Tensor], batch: Dict[str, torch.Tensor]) -> Dict[str, float]:
-        """Compute evaluation metrics."""
-        # Get predictions
-        logits = outputs['logits']
-        predictions = torch.argmax(logits, dim=-1)
-        
-        # Get targets
-        tgt_tokens = batch['tgt_tokens'][:, 1:]  # Remove BOS
-        
-        # Convert to text for BLEU calculation
-        pred_texts = self._tokens_to_text(predictions)
-        tgt_texts = self._tokens_to_text(tgt_tokens)
-        
-        # Compute BLEU
-        bleu = self.bleu_metric(pred_texts, tgt_texts)
-        
-        # Compute exact match
-        exact_match = self.exact_match_metric(pred_texts, tgt_texts)
+        perfect_rate = perfect_translations / len(all_predictions)
         
         return {
-            'bleu': bleu,
-            'exact_match': exact_match
+            "loss": avg_loss,
+            "bleu_score": bleu_score,
+            "exact_match_rate": exact_match_rate,
+            "perfect_translation_rate": perfect_rate,
+            "total_samples": len(all_predictions)
         }
     
-    def _tokens_to_text(self, tokens: torch.Tensor) -> List[str]:
-        """Convert token tensors to text."""
-        texts = []
-        for seq in tokens:
-            # Remove padding and special tokens
-            seq = seq[seq != 0]  # Remove padding
-            seq = seq[seq != 2]  # Remove BOS
-            seq = seq[seq != 3]  # Remove EOS
-            
-            if len(seq) > 0:
-                text = self.tokenizer.decode(seq.tolist())
-                texts.append(text)
+    def tokens_to_text(self, tokens: np.ndarray) -> str:
+        """Convert tokens to text (simplified)"""
+        # This is a placeholder - use proper detokenizer
+        tokens = tokens[tokens != 0]  # Remove padding
+        if len(tokens) == 0:
+            return ""
+        
+        # Simple character mapping for demonstration
+        text = ""
+        for token in tokens:
+            if token < 128:
+                text += chr(token % 26 + ord('a'))
             else:
-                texts.append("")
-        return texts
+                text += " "
+        
+        return text.strip()
     
-    def _move_to_device(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        """Move batch to device."""
-        device_batch = {}
-        for key, value in batch.items():
-            if isinstance(value, torch.Tensor):
-                device_batch[key] = value.to(self.device)
-            else:
-                device_batch[key] = value
-        return device_batch
+    def save_checkpoint(self, epoch: int, metrics: Dict[str, float], model_type: str = "multimodal"):
+        """Save model checkpoint"""
+        checkpoint_dir = Path(self.config['paths']['checkpoint_dir'])
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        checkpoint_path = checkpoint_dir / f"{model_type}_checkpoint_epoch_{epoch}_{timestamp}.pth"
+        
+        checkpoint = {
+            'epoch': epoch,
+            'timestamp': timestamp,
+            'config': self.config,
+            'metrics': metrics,
+            'model_state_dict': (self.text_model.state_dict() if model_type == "text" 
+                               else self.multimodal_model.state_dict()),
+            'optimizer_state_dict': (self.text_optimizer.state_dict() if model_type == "text"
+                                   else self.multimodal_optimizer.state_dict()),
+            'scheduler_state_dict': (self.text_scheduler.state_dict() if model_type == "text"
+                                   else self.multimodal_scheduler.state_dict())
+        }
+        
+        if model_type == "multimodal":
+            checkpoint['image_encoder_state_dict'] = self.image_encoder.state_dict()
+            checkpoint['audio_encoder_state_dict'] = self.audio_encoder.state_dict()
+            checkpoint['multimodal_encoder_state_dict'] = self.multimodal_encoder.state_dict()
+        
+        torch.save(checkpoint, checkpoint_path)
+        logger.info(f"Checkpoint saved: {checkpoint_path}")
+        
+        # Also save as best model if this is the best so far
+        if metrics.get('perfect_translation_rate', 0) > getattr(self, 'best_perfect_rate', 0):
+            self.best_perfect_rate = metrics['perfect_translation_rate']
+            best_path = checkpoint_dir / f"{model_type}_best_model.pth"
+            torch.save(checkpoint, best_path)
+            logger.info(f"Best model saved: {best_path}")
     
-    def train(self, train_data: List[Dict[str, str]], val_data: List[Dict[str, str]]) -> Dict[str, float]:
-        """Main training loop."""
-        self.logger.info("Starting multimodal NMT training...")
+    def train(self, train_data: List[Dict[str, str]], val_data: List[Dict[str, str]]):
+        """Main training loop"""
+        logger.info("Starting multimodal NMT training...")
+        
+        # Create synthetic multimodal data
+        train_image_data, train_audio_data = self.create_synthetic_multimodal_data(train_data)
+        val_image_data, val_audio_data = self.create_synthetic_multimodal_data(val_data)
         
         # Create datasets
         train_dataset = MultimodalTranslationDataset(
-            train_data, self.tokenizer, 
-            max_src_len=self.config.get('max_src_len', 512),
-            max_tgt_len=self.config.get('max_tgt_len', 512)
-        )
-        val_dataset = MultimodalTranslationDataset(
-            val_data, self.tokenizer,
-            max_src_len=self.config.get('max_src_len', 512),
-            max_tgt_len=self.config.get('max_tgt_len', 512)
+            train_data, train_image_data, train_audio_data,
+            max_length=self.config['data']['max_length']
         )
         
-        # Create data loaders
-        train_loader = DataLoader(
+        val_dataset = MultimodalTranslationDataset(
+            val_data, val_image_data, val_audio_data,
+            max_length=self.config['data']['max_length']
+        )
+        
+        # Create dataloaders
+        train_dataloader = DataLoader(
             train_dataset,
-            batch_size=self.config.get('batch_size', 32),
+            batch_size=self.config['training']['batch_size'],
             shuffle=True,
-            num_workers=self.config.get('num_workers', 4),
+            num_workers=0,
             pin_memory=True
         )
-        val_loader = DataLoader(
+        
+        val_dataloader = DataLoader(
             val_dataset,
-            batch_size=self.config.get('val_batch_size', 64),
+            batch_size=self.config['training']['batch_size'],
             shuffle=False,
-            num_workers=self.config.get('num_workers', 4),
+            num_workers=0,
             pin_memory=True
         )
+        
+        logger.info(f"Training samples: {len(train_dataset)}")
+        logger.info(f"Validation samples: {len(val_dataset)}")
         
         # Training loop
-        best_val_bleu = 0.0
-        patience = self.config.get('patience', 10)
+        best_val_metrics = {"perfect_translation_rate": 0.0}
         patience_counter = 0
         
-        for epoch in range(self.config.get('max_epochs', 100)):
-            self.current_epoch = epoch
+        for epoch in range(self.config['training']['num_epochs']):
+            logger.info(f"\nEpoch {epoch + 1}/{self.config['training']['num_epochs']}")
             
-            # Train epoch
-            train_metrics = self.train_epoch(train_loader, val_loader)
-            
-            # Validate
-            val_metrics = self.validate(val_loader)
-            
-            # Log epoch results
-            self.logger.info(
-                f"Epoch {epoch + 1}: "
-                f"Train Loss: {train_metrics['train_loss']:.4f}, "
-                f"Train BLEU: {train_metrics['train_bleu']:.4f}, "
-                f"Train EM: {train_metrics['train_em']:.4f}, "
-                f"Val Loss: {val_metrics['val_loss']:.4f}, "
-                f"Val BLEU: {val_metrics['val_bleu']:.4f}, "
-                f"Val EM: {val_metrics['val_em']:.4f}"
-            )
-            
-            # Save checkpoint if best
-            if val_metrics['val_bleu'] > best_val_bleu:
-                best_val_bleu = val_metrics['val_bleu']
-                self.best_bleu = best_val_bleu
-                self.best_exact_match = val_metrics['val_em']
+            # Train text model first (if specified)
+            if self.config['training']['train_text_first'] and epoch < self.config['training']['text_epochs']:
+                logger.info("Training text model...")
+                train_metrics = self.train_epoch(train_dataloader, "text")
+                val_metrics = self.evaluate(val_dataloader, "text")
                 
-                save_checkpoint({
-                    'epoch': epoch + 1,
-                    'model_state_dict': self.model.state_dict(),
-                    'optimizer_state_dict': self.optimizer.state_dict(),
-                    'scheduler_state_dict': self.scheduler.state_dict(),
-                    'best_bleu': best_val_bleu,
-                    'best_exact_match': self.best_exact_match,
-                    'config': self.config
-                }, f"checkpoint_best.pth")
+                logger.info(f"Text Model - Train Loss: {train_metrics['loss']:.4f}")
+                logger.info(f"Text Model - Val Loss: {val_metrics['loss']:.4f}")
+                logger.info(f"Text Model - BLEU: {val_metrics['bleu_score']:.4f}")
+                logger.info(f"Text Model - Perfect Rate: {val_metrics['perfect_translation_rate']:.1%}")
                 
+                self.save_checkpoint(epoch, val_metrics, "text")
+            
+            # Train multimodal model
+            logger.info("Training multimodal model...")
+            train_metrics = self.train_epoch(train_dataloader, "multimodal")
+            val_metrics = self.evaluate(val_dataloader, "multimodal")
+            
+            logger.info(f"Multimodal Model - Train Loss: {train_metrics['loss']:.4f}")
+            logger.info(f"Multimodal Model - Val Loss: {val_metrics['loss']:.4f}")
+            logger.info(f"Multimodal Model - BLEU: {val_metrics['bleu_score']:.4f}")
+            logger.info(f"Multimodal Model - Perfect Rate: {val_metrics['perfect_translation_rate']:.1%}")
+            
+            # Save checkpoint
+            self.save_checkpoint(epoch, val_metrics, "multimodal")
+            
+            # Early stopping check
+            if val_metrics['perfect_translation_rate'] > best_val_metrics['perfect_translation_rate']:
+                best_val_metrics = val_metrics.copy()
                 patience_counter = 0
+                logger.info(f"New best perfect translation rate: {val_metrics['perfect_translation_rate']:.1%}")
             else:
                 patience_counter += 1
+                logger.info(f"No improvement for {patience_counter} epochs")
+            
+            # Check if we reached the target
+            if val_metrics['perfect_translation_rate'] >= 0.99:
+                logger.info("🎉 TARGET ACHIEVED: 99% perfect translation rate reached!")
+                break
             
             # Early stopping
-            if patience_counter >= patience:
-                self.logger.info(f"Early stopping at epoch {epoch + 1}")
+            if patience_counter >= self.config['training']['early_stopping_patience']:
+                logger.info(f"Early stopping triggered after {epoch + 1} epochs")
                 break
         
-        self.logger.info(f"Training completed. Best BLEU: {best_val_bleu:.4f}")
+        logger.info("Training completed!")
+        logger.info(f"Best validation metrics: {best_val_metrics}")
         
-        return {
-            'best_bleu': best_val_bleu,
-            'best_exact_match': self.best_exact_match
-        }
+        return best_val_metrics
 
+def create_default_config() -> Dict[str, Any]:
+    """Create default training configuration"""
+    return {
+        'model': {
+            'vocab_size': 32000,
+            'd_model': 1024,
+            'n_heads': 16,
+            'n_encoder_layers': 12,
+            'n_decoder_layers': 12,
+            'd_ff': 4096,
+            'dropout': 0.1,
+            'max_len': 512
+        },
+        'multimodal': {
+            'image_encoder': {
+                'img_size': 224,
+                'patch_size': 16,
+                'embed_dim': 1024,
+                'num_heads': 16,
+                'num_layers': 12
+            },
+            'audio_encoder': {
+                'sample_rate': 16000,
+                'n_fft': 400,
+                'hop_length': 160,
+                'n_mels': 80,
+                'embed_dim': 1024,
+                'num_heads': 16,
+                'num_layers': 12
+            },
+            'fusion': {
+                'embed_dim': 1024,
+                'num_heads': 16,
+                'num_layers': 12
+            }
+        },
+        'training': {
+            'num_epochs': 100,
+            'batch_size': 16,
+            'learning_rate': 1e-4,
+            'weight_decay': 0.01,
+            'label_smoothing': 0.1,
+            'scheduler_t0': 10,
+            'scheduler_t_mult': 2,
+            'early_stopping_patience': 15,
+            'use_amp': True,
+            'train_text_first': True,
+            'text_epochs': 5
+        },
+        'data': {
+            'max_length': 128,
+            'train_split': 0.8,
+            'val_split': 0.2
+        },
+        'paths': {
+            'checkpoint_dir': 'models/checkpoints',
+            'log_dir': 'logs'
+        }
+    }
 
 def main():
-    """Main function for training multimodal NMT."""
-    # Configuration
-    config = {
-        'src_vocab_size': 32000,
-        'tgt_vocab_size': 32000,
-        'd_model': 1024,
-        'n_heads': 16,
-        'n_encoder_layers': 12,
-        'n_decoder_layers': 12,
-        'd_ff': 4096,
-        'max_len': 512,
-        'dropout': 0.1,
-        'batch_size': 32,
-        'val_batch_size': 64,
-        'max_epochs': 100,
-        'lr': 1e-4,
-        'multimodal_lr': 5e-5,
-        'encoder_lr': 1e-4,
-        'fusion_lr': 1e-4,
-        'weight_decay': 0.01,
-        'grad_clip': 1.0,
-        'warmup_steps': 4000,
-        'T_0': 10,
-        'T_mult': 2,
-        'min_lr': 1e-6,
-        'patience': 10,
-        'val_interval': 100,
-        'use_images': True,
-        'use_audio': True,
-        'fusion_strategy': 'cross_attention',
-        'curriculum_learning': True,
-        'use_wandb': True,
-        'device': 'cuda' if torch.cuda.is_available() else 'cpu',
-        'num_workers': 4,
-        'log_dir': 'logs',
-        'max_src_len': 512,
-        'max_tgt_len': 512
-    }
+    """Main function to train multimodal NMT model"""
+    logger.info("Starting Multimodal Korean-English NMT Training")
     
-    # Load data (this should be replaced with actual data loading)
-    # For now, create dummy data for demonstration
-    train_data = create_dummy_multimodal_data(1000)
-    val_data = create_dummy_multimodal_data(200)
+    # Create configuration
+    config = create_default_config()
     
     # Create trainer
     trainer = MultimodalNMTTrainer(config)
     
-    # Train model
-    results = trainer.train(train_data, val_data)
+    # Create training data
+    logger.info("Creating training data...")
+    train_data = trainer.create_enhanced_training_data()
     
-    print(f"Training completed!")
-    print(f"Best BLEU score: {results['best_bleu']:.4f}")
-    print(f"Best Exact Match: {results['best_exact_match']:.4f}")
+    # Split into train and validation
+    split_idx = int(len(train_data) * config['data']['train_split'])
+    train_split = train_data[:split_idx]
+    val_split = train_data[split_idx:]
+    
+    logger.info(f"Train samples: {len(train_split)}")
+    logger.info(f"Validation samples: {len(val_split)}")
+    
+    # Start training
+    best_metrics = trainer.train(train_split, val_split)
+    
+    # Final results
+    logger.info("\n" + "="*60)
+    logger.info("TRAINING COMPLETED")
+    logger.info("="*60)
+    logger.info(f"Best Perfect Translation Rate: {best_metrics['perfect_translation_rate']:.1%}")
+    logger.info(f"Best BLEU Score: {best_metrics['bleu_score']:.4f}")
+    logger.info(f"Best Exact Match Rate: {best_metrics['exact_match_rate']:.1%}")
+    
+    if best_metrics['perfect_translation_rate'] >= 0.99:
+        logger.info("✅ SUCCESS: Target 99% perfect translation achieved!")
+    else:
+        gap = 0.99 - best_metrics['perfect_translation_rate']
+        logger.info(f"❌ TARGET NOT REACHED: Gap of {gap:.1%} to 99% target")
+        logger.info("Recommendations: Increase training data, adjust hyperparameters, or extend training time")
 
-
-def create_dummy_multimodal_data(n_samples: int) -> List[Dict[str, Any]]:
-    """Create dummy multimodal data for testing."""
-    data = []
-    
-    korean_sentences = [
-        "안녕하세요",
-        "감사합니다",
-        "죄송합니다",
-        "네, 알겠습니다",
-        "아니요, 괜찮습니다",
-        "도와주세요",
-        "어디에 있나요?",
-        "얼마예요?",
-        "맛있어요",
-        "추워요"
-    ]
-    
-    english_translations = [
-        "Hello",
-        "Thank you",
-        "I'm sorry",
-        "Yes, I understand",
-        "No, it's okay",
-        "Help me",
-        "Where is it?",
-        "How much is it?",
-        "It's delicious",
-        "It's cold"
-    ]
-    
-    for i in range(n_samples):
-        idx = i % len(korean_sentences)
-        
-        item = {
-            'source': korean_sentences[idx],
-            'target': english_translations[idx],
-            'domain': 'daily_conversation',
-            'difficulty': np.random.uniform(0.1, 1.0)
-        }
-        
-        # Add image path for 70% of samples
-        if np.random.random() < 0.7:
-            item['image_path'] = f'data/images/sample_{i % 100}.jpg'
-        
-        # Add audio path for 60% of samples
-        if np.random.random() < 0.6:
-            item['audio_path'] = f'data/audio/sample_{i % 100}.wav'
-            item['audio_length'] = np.random.randint(1000, 5000)
-        
-        data.append(item)
-    
-    return data
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

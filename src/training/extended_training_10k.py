@@ -8,8 +8,8 @@ import time
 import json
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
-from cvm_translator.cvm_transformer import CVMTransformer
-from cvm_translator.kd_losses import compute_loss
+from src.models.cvm_transformer import CVMTransformer
+from src.training.kd_losses import compute_loss
 from collections import defaultdict
 
 

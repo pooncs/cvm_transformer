@@ -7,8 +7,8 @@ import torch
 import time
 import sys
 sys.path.insert(0, '.')
-from cvm_translator.cvm_transformer import CVMTransformer
-from cvm_translator.sp_tokenizer import SPTokenizer
+from src.models.cvm_transformer import CVMTransformer
+from src.models.sp_tokenizer import SPTokenizer
 
 def simple_training_test():
     """Simple training test with 1000 iterations"""

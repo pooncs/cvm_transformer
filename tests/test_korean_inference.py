@@ -8,7 +8,7 @@ import torch
 import time
 import json
 from collections import defaultdict
-from cvm_translator.cvm_transformer import CVMTransformer
+from src.models.cvm_transformer import CVMTransformer
 
 
 class SimpleTokenizer:

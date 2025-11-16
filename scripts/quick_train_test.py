@@ -13,7 +13,7 @@ import time
 import sys
 sys.path.append('.')
 
-from cvm_translator.sp_tokenizer import SPTokenizer
+from src.models.sp_tokenizer import SPTokenizer
 
 class QuickTranslationDataset(Dataset):
     """Quick dataset for testing."""

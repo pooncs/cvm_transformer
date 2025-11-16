@@ -5,6 +5,9 @@ __pycache__/
 *.pt
 *.pth
 *.json
+logs*/
+reports*/
+checkpoints*/
 
 # Project-specific artifacts
 checkpoints/

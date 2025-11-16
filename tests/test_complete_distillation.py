@@ -16,7 +16,7 @@ def test_complete_distillation():
     logger.info("Testing complete distillation framework...")
     
     try:
-        from cvm_translator.model_distillation import ModelDistiller, DistillationConfig
+        from src.training.model_distillation import ModelDistiller, DistillationConfig
         
         # Create configuration for quick test
         config = DistillationConfig(

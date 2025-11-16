@@ -8,7 +8,7 @@ import torch
 import time
 import json
 from torch.utils.data import Dataset, DataLoader
-from cvm_translator.cvm_transformer import CVMTransformer
+from src.models.cvm_transformer import CVMTransformer
 
 
 class BiTextDataset(Dataset):

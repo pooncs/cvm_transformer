@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
-from cvm_translator.model_distillation import ModelDistiller, DistillationConfig
+from src.training.model_distillation import ModelDistiller, DistillationConfig
 
 # Configure detailed logging
 logging.basicConfig(

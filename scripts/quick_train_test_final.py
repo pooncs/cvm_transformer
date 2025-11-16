@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Quick training loop test for CVM transformer with 1000 iterations
+Quick training loop test for CVM transformer with 1000 iterations - FULLY FIXED
 """
 
 import torch
 import time
 import sys
 sys.path.insert(0, '.')
-from cvm_translator.cvm_transformer import CVMTransformer
-from cvm_translator.sp_tokenizer import SPTokenizer
+from src.models.cvm_transformer import CVMTransformer
+from src.models.sp_tokenizer import SPTokenizer
 from torch.utils.data import Dataset, DataLoader
 
 class SimpleTranslationDataset(Dataset):
-    def __init__(self, tokenizer, max_len=32):
+    def __init__(self, tokenizer, max_len=16):
         self.tokenizer = tokenizer
         self.max_len = max_len
         
@@ -43,8 +43,8 @@ class SimpleTranslationDataset(Dataset):
         return {
             "src_ids": torch.tensor(src_ids, dtype=torch.long),
             "tgt_ids": torch.tensor(tgt_ids, dtype=torch.long),
-            "src_text": src_text,
-            "tgt_text": tgt_text
+            "src_len": len(src_ids),
+            "tgt_len": len(tgt_ids)
         }
 
 def collate_fn(batch):
@@ -59,25 +59,28 @@ def collate_fn(batch):
     return {
         "src_ids": src_padded,
         "tgt_ids": tgt_padded,
-        "src_texts": [b["src_text"] for b in batch],
-        "tgt_texts": [b["tgt_text"] for b in batch]
+        "src_lens": torch.tensor([b["src_len"] for b in batch]),
+        "tgt_lens": torch.tensor([b["tgt_len"] for b in batch])
     }
 
-def simple_loss(logits, targets):
+def simple_loss(logits, targets, target_lens):
     """Simple cross-entropy loss for sequence-to-sequence"""
-    # Flatten for loss computation
     batch_size, seq_len, vocab_size = logits.shape
-    logits_flat = logits.view(-1, vocab_size)
-    targets_flat = targets.view(-1)
+    total_loss = 0
+    valid_sequences = 0
     
-    # Mask padding tokens
-    mask = (targets_flat != 0).float()
+    for i in range(batch_size):
+        target_len = target_lens[i].item()
+        if target_len > 0:
+            # Only compute loss for actual target length
+            pred_logits = logits[i, :target_len, :]
+            target_ids = targets[i, :target_len]
+            
+            loss = torch.nn.functional.cross_entropy(pred_logits, target_ids, reduction='mean')
+            total_loss += loss
+            valid_sequences += 1
     
-    # Compute loss
-    loss = torch.nn.functional.cross_entropy(logits_flat, targets_flat, reduction='none')
-    masked_loss = loss * mask
-    
-    return masked_loss.sum() / mask.sum()
+    return total_loss / max(valid_sequences, 1)
 
 def train_step(model, batch, optimizer, device):
     """Single training step"""
@@ -86,12 +89,13 @@ def train_step(model, batch, optimizer, device):
     
     src_ids = batch["src_ids"].to(device)
     tgt_ids = batch["tgt_ids"].to(device)
+    tgt_lens = batch["tgt_lens"]
     
     # Forward pass
     logits = model(src_ids)
     
-    # Simple loss - predict target from source
-    loss = simple_loss(logits, tgt_ids)
+    # Compute loss with proper sequence length handling
+    loss = simple_loss(logits, tgt_ids, tgt_lens)
     
     # Backward pass
     loss.backward()

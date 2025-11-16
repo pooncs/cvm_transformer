@@ -13,7 +13,7 @@ def load_advanced_model(model_path: str, device: str):
     """Load the advanced trained model"""
     
     # Import the model architecture
-    from train_enhanced import EnhancedTransformer
+    from src.training.train_enhanced import EnhancedTransformer
     
     # Model configuration (must match training)
     config = {
