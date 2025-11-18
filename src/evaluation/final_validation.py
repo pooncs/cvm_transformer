@@ -5,6 +5,7 @@ Tests accuracy and generates detailed report
 """
 
 import torch
+from pathlib import Path
 import json
 import argparse
 import numpy as np
@@ -50,10 +51,24 @@ def load_model_and_tokenizer(model_path: str, tokenizer_model: str, device: str)
         print("Falling back to basic model loading...")
 
         # Basic model loading
-        checkpoint = torch.load(model_path, map_location=device)
+        checkpoint = torch.load(model_path, map_location=device, weights_only=False)
         from src.training.train_extended_nmt import TransformerNMT
 
-        model = TransformerNMT(vocab_size=vocab_size).to(device)
+        args = checkpoint.get("args", None)
+        if args is not None:
+            model = TransformerNMT(
+                vocab_size=vocab_size,
+                d_model=getattr(args, "d_model", 512),
+                nhead=getattr(args, "nhead", 8),
+                num_encoder_layers=getattr(args, "num_layers", 6),
+                num_decoder_layers=getattr(args, "num_layers", 6),
+                dim_feedforward=getattr(args, "dim_feedforward", 2048),
+                dropout=getattr(args, "dropout", 0.1),
+                max_len=getattr(args, "max_length", 128),
+            ).to(device)
+        else:
+            model = TransformerNMT(vocab_size=vocab_size).to(device)
+
         model.load_state_dict(checkpoint["model_state_dict"])
         model.eval()
 
@@ -178,6 +193,9 @@ def run_final_validation(
     test_data: str,
     accuracy_threshold: float = 99.0,
     max_samples: int = None,
+    search_strategy: str = "beam",
+    beam_size: int = 5,
+    length_penalty: float = 0.6,
 ):
     """Run final comprehensive validation"""
 
@@ -222,6 +240,12 @@ def run_final_validation(
 
         # Translate
         start_time = time.time()
+        if use_beam_search and hasattr(model_or_inference, "decoder"):
+            model_or_inference.decoder.beam_size = beam_size
+            model_or_inference.decoder.length_penalty = length_penalty
+            if hasattr(model_or_inference.decoder, "strategy"):
+                model_or_inference.decoder.strategy = search_strategy
+
         hypothesis = translate_text(
             model_or_inference, korean, tokenizer, use_beam_search
         )
@@ -251,6 +275,18 @@ def run_final_validation(
     bleu_scores = [r["bleu_score"] for r in results]
     char_accuracies = [r["character_accuracy"] for r in results]
     exact_matches = [r["exact_match"] for r in results]
+    try:
+        from src.utils.metrics import ROUGELScore, SimpleMETEOR
+
+        rouge = ROUGELScore()(
+            [r["reference"] for r in results], [r["hypothesis"] for r in results]
+        )
+        meteor = SimpleMETEOR()(
+            [r["reference"] for r in results], [r["hypothesis"] for r in results]
+        )
+    except Exception:
+        rouge = 0.0
+        meteor = 0.0
 
     avg_bleu = np.mean(bleu_scores)
     avg_char_acc = np.mean(char_accuracies)
@@ -273,6 +309,8 @@ def run_final_validation(
     print(f"Average BLEU Score: {avg_bleu:.4f}")
     print(f"Average Character Accuracy: {avg_char_acc:.4f}")
     print(f"Exact Match Rate: {exact_match_rate:.4f}")
+    print(f"Average ROUGE-L: {float(rouge):.4f}")
+    print(f"Average METEOR: {float(meteor):.4f}")
     print(f"Average Inference Time: {avg_inference_time:.4f}s")
     print(f"Translation Accuracy: {translation_accuracy:.2f}%")
     print(f"Target Threshold: {accuracy_threshold}%")
@@ -292,29 +330,31 @@ def run_final_validation(
     # Save detailed results
     output_file = "final_validation_results.json"
     with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(
-            {
-                "summary": {
-                    "total_samples": len(results),
-                    "translation_accuracy": translation_accuracy,
-                    "avg_bleu_score": avg_bleu,
-                    "avg_character_accuracy": avg_char_acc,
-                    "exact_match_rate": exact_match_rate,
-                    "avg_inference_time": avg_inference_time,
-                    "meets_threshold": meets_threshold,
-                    "threshold": accuracy_threshold,
-                },
-                "detailed_results": results,
-                "model_info": {
-                    "model_path": model_path,
-                    "tokenizer_model": tokenizer_model,
-                    "use_beam_search": use_beam_search,
-                },
+        payload = {
+            "summary": {
+                "total_samples": int(len(results)),
+                "translation_accuracy": float(translation_accuracy),
+                "avg_bleu_score": float(avg_bleu),
+                "avg_character_accuracy": float(avg_char_acc),
+                "exact_match_rate": float(exact_match_rate),
+                "avg_inference_time": float(avg_inference_time),
+                "avg_rouge_l": float(rouge),
+                "avg_meteor": float(meteor),
+                "meets_threshold": bool(meets_threshold),
+                "threshold": float(accuracy_threshold),
             },
-            f,
-            ensure_ascii=False,
-            indent=2,
-        )
+            "detailed_results": results,
+            "model_info": {
+                "model_path": model_path,
+                "tokenizer_model": tokenizer_model,
+                "use_beam_search": use_beam_search,
+            },
+        }
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    log_dir = Path("experiment_logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    with (log_dir / "validation_summary.json").open("w", encoding="utf-8") as f:
+        json.dump(payload["summary"], f, ensure_ascii=False, indent=2)
 
     print(f"\nDetailed results saved to {output_file}")
 
@@ -351,6 +391,14 @@ def main():
     )
     parser.add_argument("--accuracy-threshold", type=float, default=99.0)
     parser.add_argument("--max-samples", type=int, default=None)
+    parser.add_argument(
+        "--search-strategy",
+        type=str,
+        choices=["greedy", "beam", "diverse_beam"],
+        default="beam",
+    )
+    parser.add_argument("--beam-size", type=int, default=5)
+    parser.add_argument("--length-penalty", type=float, default=0.6)
     args = parser.parse_args()
 
     # Check if model exists
@@ -369,6 +417,9 @@ def main():
         test_data=args.test_data,
         accuracy_threshold=args.accuracy_threshold,
         max_samples=args.max_samples,
+        search_strategy=args.search_strategy,
+        beam_size=args.beam_size,
+        length_penalty=args.length_penalty,
     )
 
 

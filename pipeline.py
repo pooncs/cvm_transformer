@@ -32,10 +32,22 @@ def main():
     parser = argparse.ArgumentParser(description="Korean-English Translation Pipeline")
     parser.add_argument(
         "--stage",
-        choices=["all", "data", "train", "validate", "test"],
+        choices=["all", "data", "train", "validate", "test", "multimodal"],
         default="all",
         help="Pipeline stage to run",
     )
+    parser.add_argument(
+        "--mode",
+        choices=["text", "image", "audio", "multimodal"],
+        default="text",
+        help="Translation mode (text-only, image-to-text, audio-to-text, or multimodal)",
+    )
+    parser.add_argument(
+        "--input-file",
+        type=str,
+        help="Input file path for image/audio/multimodal translation",
+    )
+    parser.add_argument("--input-text", type=str, help="Text input for translation")
     parser.add_argument(
         "--data-size", type=int, default=50000, help="Number of training samples"
     )
@@ -161,6 +173,50 @@ def main():
             # This would need a proper inference script
             print("Translation: [Run inference script to see results]")
             print("-" * 30)
+
+    if args.stage == "multimodal":
+        # Multimodal translation
+        print("\n5. Multimodal Translation")
+        print("-" * 40)
+        print(f"Mode: {args.mode}")
+
+        # Import multimodal processor
+        try:
+            from src.multimodal.multimodal_processor import (
+                MultimodalTranslationProcessor,
+            )
+
+            processor = MultimodalTranslationProcessor(device=args.device)
+
+            if args.mode == "text" and args.input_text:
+                results = processor.multimodal_translate(text_input=args.input_text)
+            elif args.mode == "image" and args.input_file:
+                results = processor.multimodal_translate(image_path=args.input_file)
+            elif args.mode == "audio" and args.input_file:
+                results = processor.multimodal_translate(audio_path=args.input_file)
+            elif args.mode == "multimodal":
+                results = processor.multimodal_translate(
+                    text_input=args.input_text,
+                    image_path=args.input_file if args.input_file else None,
+                )
+            else:
+                print("❌ Please provide appropriate input for the selected mode")
+                return 1
+
+            # Display results
+            print(f"Status: {results['status']}")
+            print(f"Input Modalities: {results['input_modalities']}")
+            print(f"Extracted Text: {results['extracted_text']}")
+            print(f"Translation: {results['translation']}")
+            print(f"Confidence: {results['confidence']:.2f}")
+
+            if "error" in results:
+                print(f"Error: {results['error']}")
+                return 1
+
+        except ImportError as e:
+            print(f"❌ Multimodal processing not available: {e}")
+            return 1
 
     if success:
         print("\n🎉 Pipeline completed successfully!")

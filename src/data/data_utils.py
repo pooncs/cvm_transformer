@@ -8,30 +8,63 @@ import json
 import argparse
 import os
 from typing import List, Dict, Tuple
+import numpy as np
 
 
 def convert_tsv_to_json(tsv_file: str, json_file: str, max_samples: int = None) -> int:
-    """Convert TSV file to JSON format"""
     print(f"Converting {tsv_file} to {json_file}")
 
-    # Read TSV file
-    df = pd.read_csv(tsv_file, sep="\t", header=None, names=["korean", "english"])
+    df = pd.read_csv(tsv_file, sep="\t", header=None)
+
+    # Header detection and column mapping
+    header_like = df.iloc[0].astype(str).str.lower().tolist()
+    known_headers = {"korean", "english", "kr", "en"}
+    has_header = any(h in known_headers for h in header_like)
+    if has_header:
+        df = df.iloc[1:].reset_index(drop=True)
+
+    # Select columns for korean and english
+    if df.shape[1] >= 2:
+        col_k = 0
+        col_e = 1
+        # If a header row existed, try to remap by names
+        if has_header:
+            cols = [c.lower() for c in header_like]
+            if "korean" in cols and "english" in cols:
+                col_k = cols.index("korean")
+                col_e = cols.index("english")
+    else:
+        raise ValueError("TSV must have at least two columns: korean and english")
 
     # Limit samples if specified
     if max_samples:
         df = df.head(max_samples)
 
-    # Convert to list of dictionaries
+    # Domain label filtering
+    domain_labels = {
+        "daily_conversation",
+        "technology",
+        "business",
+        "education",
+        "health",
+        "news",
+        "domain",
+    }
+
     data = []
     for _, row in df.iterrows():
-        data.append(
-            {
-                "korean": str(row["korean"]).strip(),
-                "english": str(row["english"]).strip(),
-            }
-        )
+        korean = str(row[col_k]).strip()
+        english = str(row[col_e]).strip()
+        if not korean or not english:
+            continue
+        # Filter obvious non-translation labels
+        if english.lower() in domain_labels or english.lower() == "english":
+            continue
+        # Basic ascii check for english side
+        if not any(ch.isascii() for ch in english):
+            continue
+        data.append({"korean": korean, "english": english})
 
-    # Save as JSON
     with open(json_file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 

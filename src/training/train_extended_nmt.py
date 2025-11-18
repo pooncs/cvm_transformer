@@ -18,6 +18,7 @@ import sentencepiece as spm
 import math
 import wandb
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, ReduceLROnPlateau
+from torch.cuda.amp import autocast, GradScaler
 
 # Set device
 if torch.cuda.is_available():
@@ -120,7 +121,7 @@ class TransformerNMT(nn.Module):
         # Create causal mask for decoder
         tgt_length = tgt.size(1)
         tgt_mask = self.transformer.generate_square_subsequent_mask(tgt_length).to(
-            device
+            src_emb.device
         )
 
         # Transpose for transformer (seq_len, batch, features)
@@ -201,6 +202,10 @@ def train_epoch(
     epoch,
     device,
     grad_accumulation_steps=4,
+    scaler: GradScaler = None,
+    warmup_steps: int = 0,
+    base_lr: float = 1e-4,
+    ss_ratio: float = 0.0,
 ):
     model.train()
     total_loss = 0
@@ -224,14 +229,51 @@ def train_epoch(
         tgt_input = english[:, :-1]
         tgt_output = english[:, 1:]
 
-        # Forward pass
-        output = model(
-            korean,
-            tgt_input,
-            src_key_padding_mask=src_key_padding_mask,
-            tgt_key_padding_mask=tgt_key_padding_mask[:, :-1],
-            memory_key_padding_mask=src_key_padding_mask,
-        )
+        # Scheduled sampling: replace a portion of teacher tokens with model predictions
+        if ss_ratio > 0.0:
+            with torch.no_grad():
+                tmp_out = model(
+                    korean,
+                    tgt_input,
+                    src_key_padding_mask=src_key_padding_mask,
+                    tgt_key_padding_mask=tgt_key_padding_mask[:, :-1],
+                    memory_key_padding_mask=src_key_padding_mask,
+                )
+                tmp_pred = tmp_out.argmax(dim=-1)
+            ss_mask = (torch.rand_like(tgt_input.float()) < ss_ratio).to(
+                tgt_input.device
+            )
+            tgt_input = torch.where(ss_mask, tmp_pred, tgt_input)
+
+        # Dynamic grad accumulation based on mean target length
+        mean_len = english_lengths.float().mean().item()
+        acc_steps = max(1, int(mean_len / 64))
+
+        # Learning rate warmup
+        if warmup_steps > 0:
+            global_step = epoch * len(dataloader) + batch_idx
+            if global_step < warmup_steps:
+                warm_factor = max(1e-3, global_step / max(1, warmup_steps))
+                for g in optimizer.param_groups:
+                    g["lr"] = base_lr * warm_factor
+
+        if device.type == "cuda" and scaler is not None:
+            with autocast():
+                output = model(
+                    korean,
+                    tgt_input,
+                    src_key_padding_mask=src_key_padding_mask,
+                    tgt_key_padding_mask=tgt_key_padding_mask[:, :-1],
+                    memory_key_padding_mask=src_key_padding_mask,
+                )
+        else:
+            output = model(
+                korean,
+                tgt_input,
+                src_key_padding_mask=src_key_padding_mask,
+                tgt_key_padding_mask=tgt_key_padding_mask[:, :-1],
+                memory_key_padding_mask=src_key_padding_mask,
+            )
 
         # Calculate loss (ignore padding)
         output_flat = output.reshape(-1, output.size(-1))
@@ -243,13 +285,20 @@ def train_epoch(
         loss = (loss * loss_mask).sum() / loss_mask.sum()
 
         # Backward pass with gradient accumulation
-        loss = loss / grad_accumulation_steps
-        loss.backward()
+        loss = loss / acc_steps
+        if device.type == "cuda" and scaler is not None:
+            scaler.scale(loss).backward()
+        else:
+            loss.backward()
 
-        if (batch_idx + 1) % grad_accumulation_steps == 0:
+        if (batch_idx + 1) % acc_steps == 0:
             # Gradient clipping
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            optimizer.step()
+            if device.type == "cuda" and scaler is not None:
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                optimizer.step()
             optimizer.zero_grad()
 
             # Update scheduler
@@ -261,7 +310,7 @@ def train_epoch(
         correct = (pred == tgt_output) & (tgt_output != 0)
         total_correct += correct.sum().item()
         total_tokens += (tgt_output != 0).sum().item()
-        total_loss += loss.item() * grad_accumulation_steps
+        total_loss += loss.item() * acc_steps
 
         if batch_idx % 100 == 0:
             print(
@@ -356,6 +405,12 @@ def main():
     parser.add_argument("--max-length", type=int, default=128)
     parser.add_argument("--save-dir", default="models/extended")
     parser.add_argument("--quick-validation", action="store_true")
+    parser.add_argument("--warmup-epochs", type=int, default=2)
+    parser.add_argument("--scheduled-sampling-max", type=float, default=0.3)
+    parser.add_argument("--scheduled-sampling-warmup", type=int, default=5)
+    parser.add_argument("--log-dir", default="training_logs")
+    parser.add_argument("--checkpoint-dir", default="checkpoints")
+    parser.add_argument("--early-stop-patience", type=int, default=8)
     args = parser.parse_args()
 
     # Initialize wandb for experiment tracking (optional)
@@ -370,6 +425,8 @@ def main():
 
     # Create save directory
     os.makedirs(args.save_dir, exist_ok=True)
+    os.makedirs(args.log_dir, exist_ok=True)
+    os.makedirs(args.checkpoint_dir, exist_ok=True)
 
     # Load tokenizer
     tokenizer = spm.SentencePieceProcessor(model_file=args.tokenizer_model)
@@ -429,17 +486,38 @@ def main():
 
     # Training loop
     best_val_loss = float("inf")
-    patience = 10
+    patience = args.early_stop_patience
     patience_counter = 0
 
     print("Starting extended training...")
 
+    scaler = GradScaler(enabled=(device.type == "cuda"))
+    warmup_steps = args.warmup_epochs * len(train_dataloader)
+    base_lr = args.learning_rate
     for epoch in range(args.epochs):
         print(f"\nEpoch {epoch + 1}/{args.epochs}")
 
         # Train
+        ss_ratio = 0.0
+        if args.scheduled_sampling_max > 0:
+            ss_ratio = min(
+                args.scheduled_sampling_max,
+                (epoch + 1)
+                / max(1, args.scheduled_sampling_warmup)
+                * args.scheduled_sampling_max,
+            )
         train_loss, train_acc = train_epoch(
-            model, train_dataloader, optimizer, criterion, scheduler, epoch, device
+            model,
+            train_dataloader,
+            optimizer,
+            criterion,
+            scheduler,
+            epoch,
+            device,
+            scaler=scaler,
+            warmup_steps=warmup_steps,
+            base_lr=base_lr,
+            ss_ratio=ss_ratio,
         )
 
         # Validate
@@ -447,6 +525,12 @@ def main():
 
         print(f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
         print(f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
+        with open(
+            os.path.join(args.log_dir, "metrics.csv"), "a", encoding="utf-8"
+        ) as f:
+            f.write(
+                f"{epoch+1},{train_loss:.6f},{train_acc:.6f},{val_loss:.6f},{val_acc:.6f},{optimizer.param_groups[0]['lr']:.8f}\n"
+            )
 
         # Log to wandb
         if use_wandb:
@@ -481,6 +565,18 @@ def main():
             )
 
             print(f"Saved best model with validation loss: {val_loss:.4f}")
+            torch.save(
+                {
+                    "epoch": epoch + 1,
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "scheduler_state_dict": scheduler.state_dict(),
+                    "best_val_loss": best_val_loss,
+                    "val_accuracy": val_acc,
+                    "args": args,
+                },
+                os.path.join(args.checkpoint_dir, f"epoch_{epoch+1}.pt"),
+            )
         else:
             patience_counter += 1
 

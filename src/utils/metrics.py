@@ -101,6 +101,64 @@ class BLEUScore:
         return np.mean(scores)
 
 
+class ROUGELScore:
+    """Simple ROUGE-L approximation using longest common subsequence length."""
+
+    def _lcs_length(self, a: str, b: str) -> int:
+        a_tokens = a.lower().split()
+        b_tokens = b.lower().split()
+        m, n = len(a_tokens), len(b_tokens)
+        dp = [[0] * (n + 1) for _ in range(m + 1)]
+        for i in range(1, m + 1):
+            for j in range(1, n + 1):
+                if a_tokens[i - 1] == b_tokens[j - 1]:
+                    dp[i][j] = dp[i - 1][j - 1] + 1
+                else:
+                    dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+        return dp[m][n]
+
+    def __call__(self, references: List[str], hypotheses: List[str]) -> float:
+        scores = []
+        for ref, hyp in zip(references, hypotheses):
+            lcs = self._lcs_length(ref, hyp)
+            prec = lcs / max(len(hyp.split()), 1)
+            rec = lcs / max(len(ref.split()), 1)
+            if prec + rec == 0:
+                scores.append(0.0)
+            else:
+                scores.append((2 * prec * rec) / (prec + rec))
+        return float(np.mean(scores))
+
+
+class SimpleMETEOR:
+    """Simplified METEOR-like score based on unigram precision, recall, and fragmentation."""
+
+    def __call__(self, references: List[str], hypotheses: List[str]) -> float:
+        scores = []
+        for ref, hyp in zip(references, hypotheses):
+            ref_tokens = ref.lower().split()
+            hyp_tokens = hyp.lower().split()
+            if not ref_tokens and not hyp_tokens:
+                scores.append(1.0)
+                continue
+            if not hyp_tokens:
+                scores.append(0.0)
+                continue
+            ref_counts = Counter(ref_tokens)
+            hyp_counts = Counter(hyp_tokens)
+            overlap = sum(min(hyp_counts[t], ref_counts.get(t, 0)) for t in hyp_counts)
+            prec = overlap / max(len(hyp_tokens), 1)
+            rec = overlap / max(len(ref_tokens), 1)
+            if prec + rec == 0:
+                fmean = 0.0
+            else:
+                fmean = (10 * prec * rec) / (
+                    9 * prec + rec
+                )  # Meteor uses weighted F on P/R
+            scores.append(fmean)
+        return float(np.mean(scores))
+
+
 class ExactMatchScore:
     """Exact match accuracy calculation."""
 

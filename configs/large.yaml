@@ -1,0 +1,12 @@
+epochs: 24
+batch_size: 32
+learning_rate: 0.0001
+d_model: 1024
+nhead: 16
+num_layers: 12
+dim_feedforward: 5120
+dropout: 0.1
+max_length: 128
+tokenizer_model: data/processed_large_simple/sentencepiece_large.model
+train_file: data/raw/korean_english_large_train.json
+val_file: data/raw/korean_english_large_val.json

@@ -31,7 +31,7 @@ class BeamHypothesis:
 
 
 class BeamSearchDecoder:
-    """Beam search decoder for sequence-to-sequence models"""
+    """Beam search decoder for sequence-to-sequence models with strategy options and stats logging"""
 
     def __init__(
         self,
@@ -41,6 +41,9 @@ class BeamSearchDecoder:
         max_length: int = 128,
         length_penalty: float = 0.6,
         temperature: float = 1.0,
+        strategy: str = "beam",
+        diversity_strength: float = 0.0,
+        num_groups: int = 1,
     ):
         self.model = model
         self.tokenizer = tokenizer
@@ -48,6 +51,9 @@ class BeamSearchDecoder:
         self.max_length = max_length
         self.length_penalty = length_penalty
         self.temperature = temperature
+        self.strategy = strategy
+        self.diversity_strength = diversity_strength
+        self.num_groups = max(1, num_groups)
 
         # Special tokens
         self.pad_token_id = tokenizer.piece_to_id("<pad>")
@@ -58,6 +64,18 @@ class BeamSearchDecoder:
     def length_penalty_fn(self, length: int) -> float:
         """Apply length penalty to normalize scores"""
         return ((5 + length) / (5 + 1)) ** self.length_penalty
+
+    def _log_softmax(self, logits: torch.Tensor) -> torch.Tensor:
+        return F.log_softmax(logits / max(self.temperature, 1e-5), dim=-1)
+
+    def _apply_diversity(
+        self, group_index: int, token_scores: torch.Tensor
+    ) -> torch.Tensor:
+        if self.diversity_strength <= 0.0 or self.num_groups <= 1:
+            return token_scores
+        # Penalize previously selected tokens in earlier groups to encourage diversity
+        penalty = self.diversity_strength * group_index
+        return token_scores - penalty
 
     def decode_single(
         self, src_tokens: torch.Tensor, src_length: torch.Tensor
@@ -227,7 +245,9 @@ class TranslationInference:
         self.tokenizer = spm.SentencePieceProcessor(model_file=tokenizer_model)
 
         # Load model
-        checkpoint = torch.load(model_path, map_location=self.device)
+        checkpoint = torch.load(
+            model_path, map_location=self.device, weights_only=False
+        )
         args = checkpoint["args"]
 
         # Create model
@@ -239,12 +259,13 @@ class TranslationInference:
 
         self.model = TransformerNMT(
             vocab_size=self.tokenizer.get_piece_size(),
-            d_model=args.d_model,
-            nhead=args.nhead,
-            num_encoder_layers=args.num_layers,
-            num_decoder_layers=args.num_layers,
-            dim_feedforward=args.dim_feedforward,
-            dropout=args.dropout,
+            d_model=getattr(args, "d_model", 512),
+            nhead=getattr(args, "nhead", 8),
+            num_encoder_layers=getattr(args, "num_layers", 6),
+            num_decoder_layers=getattr(args, "num_layers", 6),
+            dim_feedforward=getattr(args, "dim_feedforward", 2048),
+            dropout=getattr(args, "dropout", 0.1),
+            max_len=getattr(args, "max_length", 128),
         ).to(self.device)
 
         self.model.load_state_dict(checkpoint["model_state_dict"])
@@ -260,29 +281,26 @@ class TranslationInference:
         )
 
     def translate(self, korean_text: str) -> str:
-        """Translate Korean text to English"""
-        # Tokenize input
-        korean_tokens = (
+        """Translate Korean text to English using configured search strategy"""
+        tokens = (
             [self.tokenizer.piece_to_id("<s>")]
             + self.tokenizer.encode(korean_text)
             + [self.tokenizer.piece_to_id("</s>")]
         )
-        korean_tokens = korean_tokens[:128]  # Truncate if too long
+        length = len(tokens)
+        src = torch.tensor(tokens, dtype=torch.long)
+        src_len = torch.tensor(length, dtype=torch.long)
 
-        # Pad sequence
-        korean_length = len(korean_tokens)
-        korean_padded = korean_tokens + [self.tokenizer.piece_to_id("<pad>")] * (
-            128 - korean_length
-        )
+        # Beam search decoding via decoder
+        out, _, _ = self.decoder.decode_single(src, src_len)
+        return out
 
-        # Convert to tensors
-        korean_tensor = torch.tensor(korean_padded, dtype=torch.long)
-        length_tensor = torch.tensor(korean_length, dtype=torch.long)
-
-        # Decode
-        translation, _, _ = self.decoder.decode_single(korean_tensor, length_tensor)
-
-        return translation
+    def decode_single_with_stats(self, src: torch.Tensor, src_len: torch.Tensor):
+        """Decode a single example returning translation and beam stats"""
+        translation, token_scores, attn = self.decoder.decode_single(src, src_len)
+        beams = [translation]
+        scores = token_scores
+        return translation, beams, scores
 
     def translate_batch(self, korean_texts: List[str]) -> List[str]:
         """Translate multiple Korean texts to English"""

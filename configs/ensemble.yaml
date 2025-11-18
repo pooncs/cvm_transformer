@@ -1,0 +1,5 @@
+variants:
+  - {d_model: 768, nhead: 12, num_layers: 8, dim_feedforward: 3072}
+  - {d_model: 1024, nhead: 16, num_layers: 10, dim_feedforward: 4096}
+  - {d_model: 1024, nhead: 16, num_layers: 12, dim_feedforward: 5120}
+weights: [0.3, 0.3, 0.4]
