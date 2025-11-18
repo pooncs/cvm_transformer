@@ -218,7 +218,7 @@ class MultimodalTranslatorApp:
             try:
                 self.processor = MultimodalTranslationProcessor(
                     tokenizer_path="data/processed_large_simple/sentencepiece_large.model",
-                    model_path="best_advanced_nmt_model.pt"
+                    model_path="models/extended/best_model.pt"
                 )
                 logger.info("Multimodal processor initialized")
             except Exception as e:
